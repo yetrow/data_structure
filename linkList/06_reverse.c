@@ -70,6 +70,6 @@ int main(void)
     head=Insert(head,5);
     print(head);
     printf("\nReversed list:"); // 添加提示信息
-    reverse(head);
+    reverse(head); 
     print(head); // 打印反转后的链表
 }
