@@ -47,6 +47,7 @@ void reverse(Node* p)
     满足基本情况： if(p->next == NULL).
     执行 head = p;：将全局 head 指针更新为指向节点 5。这是反转后链表的新的头部。
     执行 return;：函数返回。*/
+    
     reverse(p->next);
 
 /*  reverse(4) 返回后执行

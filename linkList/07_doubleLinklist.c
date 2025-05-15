@@ -18,15 +18,31 @@ Node* GetNewNode(int x);
 这是为了解决 InsertAtHead 中调用 GetNewNode 时，GetNewNode 还没有被定义的问题。*/
 void InsertAtHead(int x)
 {
-    Node* temp=GetNewNode(x);
-    if(head==NULL)
+    //头插法
+    // Node* temp=GetNewNode(x);
+    // if(head==NULL)
+    // {
+    //     head=temp;
+    //     return;
+    // }
+    // head->prev=temp;
+    // temp->next=head;
+    // head=temp;
+
+    //尾插法
+    Node* temp = GetNewNode(x);
+    if (head == NULL)
     {
-        head=temp;
+        head = temp;
         return;
     }
-    head->prev=temp;
-    temp->next=head;
-    head=temp;
+    Node* current = head;
+    while (current->next != NULL)
+    {
+        current = current->next;
+    }
+    current->next = temp;
+    temp->prev = current;
 }
 
 Node* GetNewNode(int x)
