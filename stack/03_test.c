@@ -66,7 +66,7 @@ int main(void)
     head=Insert(head,4);
     head=Insert(head,5);
     print(head);
-    reverse(head);
+    head=reverse(head);
     print(head);
 
     return 0;
