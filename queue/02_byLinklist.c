@@ -64,6 +64,7 @@ int main(void)
     Enqueue(3);Print();
     Dequeue();Print();
     Enqueue(4);Print();
+    printf("Front element is: %d\n", Front());
 
     return 0;
 }
