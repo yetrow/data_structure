@@ -60,7 +60,7 @@ int FindMax(BstNode* root)
     return FindMax(root->right);
 }
 
-//时间复杂度O(n)
+//时间复杂度为O(n)
 int FindHeight(BstNode* root)
 {
     if(root==NULL)  return -1; //树为空时高度为0
