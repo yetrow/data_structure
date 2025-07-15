@@ -47,6 +47,13 @@ int main(void)
     Insert(2,1);
     Insert(3,2);
     Insert(4,2);
+    Insert(5,3);
+    Insert(6,4);
     print();
     return 0;
 }
+
+    
+
+
+
