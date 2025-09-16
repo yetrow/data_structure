@@ -14,8 +14,7 @@ Node* Insert(Node*head,int x)
     //头插法
     // struct Node*temp=(Node*)malloc(sizeof(Node));
     // temp->data=x;
-    // temp->next=NULL;
-    // if(head!=NULL) temp->next=head;
+    // temp->next=head;
     // head=temp;
     // return head;
 
@@ -38,7 +37,6 @@ void print(Node* p)
     if(p==NULL) return;
     print(p->next);
     printf(" %d",p->data);
-
 }
 
 int main(void)
