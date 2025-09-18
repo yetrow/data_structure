@@ -1,42 +1,43 @@
-#include<stdio.h>
-#include<stdlib.h>
-//删除链表任意位置元素
+#include <stdio.h>
+#include <stdlib.h>
+// 删除链表任意位置元素
 
-typedef struct Node{
+typedef struct Node
+{
     int data;
-    struct Node* next
-}Node;
+    struct Node *next
+} Node;
 
-Node* head;
-void Insert(int x,int n);
+Node *head;
+void Insert(int x, int n);
 void print();
 
 void delete(int n)
 {
-    Node* temp1=head;
-    if(n==1)
+    Node *temp1 = head;
+    if (n == 1)
     {
-        head=temp1->next;
+        head = temp1->next;
         free(temp1);
-        return ;
+        return;
     }
-    for(int i=0;i<n-2;i++)
+    for (int i = 0; i < n - 2; i++)
     {
-        temp1=temp1->next;
+        temp1 = temp1->next;
     }
-    Node* temp2=temp1->next;
-    temp1->next=temp2->next;
+    Node *temp2 = temp1->next;
+    temp1->next = temp2->next;
     free(temp2);
 }
 
 int main(void)
 {
-    head =NULL;
-    Insert(1,1);
-    Insert(2,1);
-    Insert(3,2);
-    Insert(4,2);
-    Insert(5,3);
+    head = NULL;
+    Insert(1, 1);
+    Insert(2, 1);
+    Insert(3, 2);
+    Insert(4, 2);
+    Insert(5, 3);
     print();
     delete(4);
     puts("\n");
@@ -44,33 +45,32 @@ int main(void)
     return 0;
 }
 
-void Insert(int x,int n)
+void Insert(int x, int n)
 {
-    Node* temp1=(Node*)malloc(sizeof(Node*));
-    temp1->data=x;
-    temp1->next=head;
-    if(n==1)
+    Node *temp1 = (Node *)malloc(sizeof(Node *));
+    temp1->data = x;
+    temp1->next = head;
+    if (n == 1)
     {
-        temp1->next=head;
-        head=temp1;
+        temp1->next = head;
+        head = temp1;
         return;
     }
-    Node* temp2=head;
-    for(int i=0;i<n-2;i++)
+    Node *temp2 = head;
+    for (int i = 0; i < n - 2; i++)
     {
-        temp2=temp2->next;
+        temp2 = temp2->next;
     }
-    temp1->next=temp2->next;
-    temp2->next=temp1;
+    temp1->next = temp2->next;
+    temp2->next = temp1;
 }
 
 void print()
 {
-    Node* temp=head;
-    while(temp!=NULL)
+    Node *temp = head;
+    while (temp != NULL)
     {
-        printf(" %d",temp->data);
-        temp=temp->next;
+        printf(" %d", temp->data);
+        temp = temp->next;
     }
 }
-
