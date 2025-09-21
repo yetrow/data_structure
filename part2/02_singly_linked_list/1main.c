@@ -25,7 +25,7 @@ Node *createNode(int data)
 
 // headRef是指向head指针的指针
 // 这样我们才能在链表为空的时候修改head
-void list_append(Node **headRef, int data) // 追加函数
+void list_append(Node **headRef, int data) // 末尾追加函数
 {
     Node *newNode = createNode(data);
     if (newNode == NULL)
@@ -45,7 +45,7 @@ void list_append(Node **headRef, int data) // 追加函数
     last->next = newNode;
 }
 
-void prepenNode(Node **headRef, int data) // 追加
+void prepenNode(Node **headRef, int data) // 头结点追加
 {
     Node *newNode = createNode(data);
     newNode->next = *headRef;
@@ -78,12 +78,12 @@ Node *findNode(Node *head, int data)
     return NULL;
 }
 
-void updataNode(Node *head, int oldData, int newData)
+void updateNode(Node *head, int oldData, int newData)
 {
-    Node *nodeToUpdata = findNode(head, oldData);
-    if (nodeToUpdata != NULL)
+    Node *temp = findNode(head, oldData);
+    if (temp != NULL)
     {
-        nodeToUpdata->data = newData;
+        temp->data = newData;
         printf("数据%d已经成功更新至%d.\n", oldData, newData);
     }
     else
@@ -150,6 +150,9 @@ int main(void)
     printList(head);
 
     prepenNode(&head,50);
+    printList(head);
+
+    deleteNode(&head,50);
     printList(head);
 
     list_free(&head);
