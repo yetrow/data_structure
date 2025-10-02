@@ -47,7 +47,7 @@ int main(void)
 
 void Insert(int x, int n)
 {
-    Node *temp1 = (Node *)malloc(sizeof(Node *));
+    Node *temp1 = (Node *)malloc(sizeof(Node));
     temp1->data = x;
     temp1->next = head;
     if (n == 1)

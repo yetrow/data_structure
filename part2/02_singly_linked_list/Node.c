@@ -1,4 +1,4 @@
-#define _CRT_SECURE_WARNINGS_
+#define _CRT_SECURE_NO_WARNINGS_
 #include "Node.h"
 #include <stdio.h>
 #include <stdlib.h>
