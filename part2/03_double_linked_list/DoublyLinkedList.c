@@ -17,7 +17,7 @@ static Node *createNode(Song songData)
     Node *newNode = (Node *)malloc(sizeof(Node));
     if (!newNode)
     {
-        perror("failed to allocate memory for new node.");
+        perror("Failed to allocate memory for new node.");
         return NULL;
     }
     // 初始化节点数据，为节点分配内存
