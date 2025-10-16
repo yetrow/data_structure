@@ -117,8 +117,8 @@ DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
         return NULL;
     }
 
-    list->pool = MemoryPool_Create(initial_capacity);
-    if(!list->pool)
+    list->pool = MemoryPool_Create(initial_capacity); //  创建指定初始容量的内存池
+    if(!list->pool) //  检查内存池是否创建成功
     {
         free(list);
         return NULL;
@@ -130,7 +130,7 @@ DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
     list->user_free_func = free_func; //  设置用户自定义的内存释放函数
 
     // 安全的初始化互斥锁
-    if(mtx_init(&list->lock, mtx_plain) != thrd_success)
+    if(mtx_init(&list->lock, mtx_plain) != thrd_success) //  尝试初始化互斥锁，如果失败则进入错误处理
     {
         perror("Failed to initialize mutex");
         MemoryPool_Destory(list->pool);
@@ -138,5 +138,224 @@ DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
         return NULL;
     }
 
-    return list;
+    return list; //  返回初始化完成的链表结构体指针
+}
+
+void List_Destory(DoublyLinkedList** list_ptr)
+{
+    if(!list_ptr)   return ;
+
+    DoublyLinkedList* list = *list_ptr;
+
+    mtx_lock(&list->lock); //  获取链表的互斥锁，确保线程安全
+
+    DListNode* current = list->head;
+    while(current != NULL)
+    {
+        DListNode* next_node = current->next; //  保存当前节点的下一个节点指针，防止后续操作导致链表断裂
+        if(list->user_free_func && current->data) //  如果用户定义了释放函数且当前节点有数据，则调用释放函数
+        {
+            list->user_free_func(current->data);
+        }
+        
+        current = next_node;
+    }
+
+    MemoryPool_Destory(list->pool);
+    mtx_unlock(&list->lock);
+    mtx_destroy(&list->lock);
+    free(list);
+    *list_ptr = NULL;
+}
+
+// 内部辅助函数：创建一个新的节点
+static DListNode* _internal_Create(DoublyLinkedList* list, const void* data)
+{
+    if(!list || !list->pool)    return NULL;
+
+    DListNode* new_node = MemoryPool_AllocateNode(list->pool); //  从内存池中分配一个新的节点
+    if(!new_node)
+    {
+        perror("Failed to allocate node from memory pool");
+    }
+
+    new_node->data = (void*)data; //  设置新节点的数据为传入的数据，并将前后指针初始化为NULL
+    // 将新节点链接到其他节点的操作由调用者完成
+    new_node->next = NULL;
+    new_node->prev = NULL;
+    
+    return new_node;
+}
+
+bool List_Append(DoublyLinkedList* list, const void* data)
+{
+    if(!list || !data)  return false;
+
+    mtx_lock(&list->lock);
+    
+    DListNode* new_node = _internal_Create(list, data);
+    if(!new_node)
+    {
+        mtx_unlock(&list->lock);
+        return false;
+    }
+
+    if(list->tail == NULL)
+    {
+        list->head = new_node;
+        list->tail = new_node;
+    }
+    else
+    {
+        list->tail->next = new_node;
+        new_node->prev = list->tail;
+        list->tail = new_node;
+    }
+    list->size++;
+    mtx_unlock(&list->lock);
+    return true;
+}
+
+bool List_Prepend(DoublyLinkedList* list, const void* data)
+{
+    DListNode* new_node = _internal_Create(list, data);
+
+    if(!new_node)
+    {
+        mtx_unlock(&list->lock);
+        return false;
+    }
+
+    if(list->head == NULL)
+    {
+        list->head = new_node;
+        list->tail = new_node;
+    }
+    else
+    {
+        new_node->next = list->head;
+        list->head->prev = new_node;
+        list->head = new_node;
+    }
+    list->size++;
+    mtx_unlock(&list->pool);
+
+    return true;
+}
+
+void List_DeleteNode(DoublyLinkedList* list, DListNode* node)
+{
+    if(!list || !node)  return ;
+
+    mtx_lock(&list->lock);
+
+    if(node->prev)
+    {
+        node->prev->next = node->next;
+    }
+    else
+    {
+        list->head = node->next;
+    }
+
+    if(node->next)
+    {
+        node->next->prev = node->prev;
+    }
+    else
+    {
+        list->tail = node->prev;
+    }
+
+    if(list->user_free_func && node->data)
+    {
+        list->user_free_func(node->data);
+    }
+
+    MemoryPool_FreeNode(list->pool, node);
+    list->size--;
+    mtx_unlock(&list->lock);
+}
+
+DListNode* List_Find(DoublyLinkedList* list, const void* data, CompareFunc compare_func)
+{
+    if(!list || !data || !compare_func)  return NULL;
+
+    mtx_lock(&list->lock);
+
+    DListNode* current = list->head;
+    while(current != NULL)
+    {
+        if(compare_func(current->data, data) == 0)
+        {
+            mtx_unlock(&list->lock);
+            return current;
+        }  
+        current = current->next;
+    }
+
+    mtx_unlock(&list->lock);
+    return NULL;
+}
+
+size_t List_GetSize(const DoublyLinkedList* list)
+{
+    if(!list)  return 0;
+
+    // mtx_lock(&list->lock);
+    // size_t size = list->size;
+    // mtx_unlock(&list->lock);
+
+    return size;
+}
+
+void List_ForEach(const DoublyLinkedList* list, ActionFunc action_func, void* context)
+{
+    if(!list || !action_func)  return ;
+
+    mtx_lock(&list->lock);
+
+    DListNode* current = list->head;
+    while(current != NULL)
+    {
+        action_func(current->data, context);
+        current = current->next;
+    }
+
+    mtx_unlock(&list->lock);
+}
+
+size_t List_GetList(DListNode* node)
+{
+    return node ? node->data : NULL;
+}
+
+bool List_InsertAfter(DoublyLinkedList* list, DListNode* node, const void* data)
+{
+    if(!list || !node || !data)  return false;
+
+    mtx_lock(&list->lock);
+
+    DListNode* new_node = _internal_Create(list, data);
+    if(!new_node)
+    {
+        mtx_unlock(&list->lock);
+        return false;
+    }
+
+    new_node->next = node->next;
+    new_node->prev = node;
+    if(node->next)
+    {
+        node->next->prev = new_node;
+    }
+    else
+    {
+        list->tail = new_node;
+    }
+
+    node->next = new_node;
+    list->size++;
+    mtx_unlock(&list->lock);
+    return true;
 }
