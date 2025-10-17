@@ -1,7 +1,8 @@
 {
     "files.associations": {
         "stdarg.h": "c",
-        "threads.h": "c"
+        "threads.h": "c",
+        "doublylinkedlist.h": "c"
     },
     "cSpell.words": [
         "CODEGEEK",

@@ -30,18 +30,20 @@ typedef void (*ActionFunc)(void *data, void *arg);
 
 DoublyLinkedList *List_Create(size_t initial_capacity, FreeFunc free_func);
 
-void List_Destory(DoublyLinkedList** list);
+void List_Destroy(DoublyLinkedList** list);
 
 bool List_Append(DoublyLinkedList *list, const void *data);
 
 bool List_Prepend(DoublyLinkedList *list, const void *data);
 
-bool vList_InsertAfter(DoublyLinkedList *list, DListNode *node, const void *data);
+bool List_InsertAfter(DoublyLinkedList *list, DListNode *node, const void *data);
 
 void List_DeleteNode(DoublyLinkedList *list, DListNode *node);
 
-DListNode List_Find(DoublyLinkedList *list, const void *data_to_find, CompareFunc compare_func);
+DListNode* List_Find(DoublyLinkedList *list, const void *data_to_find, CompareFunc compare_func);
 
 size_t List_GetSize(const DoublyLinkedList *list);
 
 void List_ForEach(const DoublyLinkedList *list, ActionFunc action_func, void *context);
+
+void*  List_GetData(const DListNode* node);

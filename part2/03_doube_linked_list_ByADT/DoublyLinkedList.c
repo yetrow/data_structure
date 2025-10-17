@@ -69,7 +69,7 @@ static MemoryPool* MemoryPool_Create(size_t initial_capacity)
     return pool;
 }
 
-static void MemoryPool_Destory(MemoryPool* pool)
+static void MemoryPool_Destroy(MemoryPool* pool)
 {
     if(!pool)   return ;
     free(pool->pool_memory);
@@ -133,7 +133,7 @@ DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
     if(mtx_init(&list->lock, mtx_plain) != thrd_success) //  尝试初始化互斥锁，如果失败则进入错误处理
     {
         perror("Failed to initialize mutex");
-        MemoryPool_Destory(list->pool);
+        MemoryPool_Destroy(list->pool);
         free(list);
         return NULL;
     }
@@ -141,9 +141,9 @@ DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
     return list; //  返回初始化完成的链表结构体指针
 }
 
-void List_Destory(DoublyLinkedList** list_ptr)
+void List_Destroy(DoublyLinkedList** list_ptr)
 {
-    if(!list_ptr)   return ;
+    if(!list_ptr || !*list_ptr)   return ;
 
     DoublyLinkedList* list = *list_ptr;
 
@@ -161,7 +161,7 @@ void List_Destory(DoublyLinkedList** list_ptr)
         current = next_node;
     }
 
-    MemoryPool_Destory(list->pool);
+    MemoryPool_Destroy(list->pool);
     mtx_unlock(&list->lock);
     mtx_destroy(&list->lock);
     free(list);
@@ -218,6 +218,9 @@ bool List_Append(DoublyLinkedList* list, const void* data)
 
 bool List_Prepend(DoublyLinkedList* list, const void* data)
 {
+    if (!list || !data) return false;
+
+    mtx_lock(&list->lock);
     DListNode* new_node = _internal_Create(list, data);
 
     if(!new_node)
@@ -238,7 +241,7 @@ bool List_Prepend(DoublyLinkedList* list, const void* data)
         list->head = new_node;
     }
     list->size++;
-    mtx_unlock(&list->pool);
+    mtx_unlock(&list->lock);
 
     return true;
 }
@@ -302,9 +305,9 @@ size_t List_GetSize(const DoublyLinkedList* list)
 {
     if(!list)  return 0;
 
-    // mtx_lock(&list->lock);
-    // size_t size = list->size;
-    // mtx_unlock(&list->lock);
+    mtx_lock((mtx_t*)&list->lock);
+    size_t size = list->size;
+    mtx_unlock((mtx_t*)&list->lock);
 
     return size;
 }
@@ -313,7 +316,7 @@ void List_ForEach(const DoublyLinkedList* list, ActionFunc action_func, void* co
 {
     if(!list || !action_func)  return ;
 
-    mtx_lock(&list->lock);
+    mtx_lock((mtx_t*)&list->lock);
 
     DListNode* current = list->head;
     while(current != NULL)
@@ -322,10 +325,10 @@ void List_ForEach(const DoublyLinkedList* list, ActionFunc action_func, void* co
         current = current->next;
     }
 
-    mtx_unlock(&list->lock);
+    mtx_unlock((mtx_t*)&list->lock);
 }
 
-size_t List_GetList(DListNode* node)
+void*  List_GetData(const DListNode* node)
 {
     return node ? node->data : NULL;
 }
