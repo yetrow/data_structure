@@ -102,6 +102,11 @@ static void MemoryPool_FreeNode(MemoryPool* pool, DListNode* node)
 }
 
 // 实例的工厂函数（设计模式）
+/*
+通过在 `List_Create` 时传入 `free_func`，
+这个函数指针被存储在 `DoublyLinkedList` 结构体内部（即 `list->user_free_func`），
+
+*/
 DoublyLinkedList* List_Create(size_t initial_capacity, FreeFunc free_func)
 {
     if(initial_capacity == 0)
