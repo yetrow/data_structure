@@ -80,10 +80,12 @@ bool stack_pop(Stack* stack, void* output_buffer)
 
     if(stack_is_empty(stack))    return false;      
 
+    // 计算栈顶元素的地址
     void* address = (char*)stack->data + (stack->top * stack->element_size);
-
+    // 将栈顶数据拷贝到用户的缓冲区
     memcpy(output_buffer, address, stack->element_size);
 
+    // 逻辑删除：通过移动指针来宣告一块数据无效，而不是花费时间去清理它
     stack->top--;      // 栈顶指针下移
 
     return true;
