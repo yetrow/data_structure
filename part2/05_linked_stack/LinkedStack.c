@@ -13,8 +13,8 @@ typedef struct Node
 struct LinkedStack
 {
     Node* top;
-    size_t element_size;
-    size_t size;
+    size_t element_size;        // 栈中每个元素的大小（字节）
+    size_t size;                // 栈中元素的个数
 } ;
 
 Stack* stack_create(size_t element_size)
@@ -111,9 +111,9 @@ bool stack_peek(const Stack* stack, void* output_buffer)
 
 bool stack_is_empty( const Stack* stack)
 {
-    if(stack == NULL)   return true;
+    if(stack == NULL)   return true;            
 
-    return stack->top == NULL;
+    return stack->top == NULL;      
 }
 
 size_t stack_get_size(const Stack* stack)
