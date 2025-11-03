@@ -50,7 +50,7 @@ void stack_destroy(Stack** stack_p)
     }
 
     free(stack);
-    *stack_p == NULL;
+    *stack_p = NULL;
 }
 
 bool stack_push(Stack* stack, const void* element_data)
