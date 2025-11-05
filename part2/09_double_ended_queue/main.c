@@ -30,7 +30,7 @@ void test_deque_as_queue()
     }
     printf("\n");
     printf("当前大小：%zu\n", deque_get_size(dq));
-    deque_destory(&dq);
+    deque_destroy(&dq);
     printf("\n");
 }
 
@@ -62,7 +62,7 @@ void test_deque_as_stack_push_back()
     }
     printf("\n");
     printf("当前大小：%zu\n", deque_get_size(dq));
-    deque_destory(&dq);
+    deque_destroy(&dq);
     printf("\n");
 }
 
@@ -94,7 +94,7 @@ void test_deque_as_stack_push_front()
     }
     printf("\n");
     printf("当前大小：%zu\n", deque_get_size(dq));
-    deque_destory(&dq);
+    deque_destroy(&dq);
     printf("\n");
 }
 
@@ -123,7 +123,7 @@ void test_deque_full_and_empty()
     printf("Is empty: %s\n", deque_is_empty(dq) ? "true" : "false");
     printf("Size: %zu\n", deque_get_size(dq));
 
-    deque_destory(&dq);
+    deque_destroy(&dq);
 }
 
 

@@ -8,7 +8,7 @@ typedef struct Deque Deque;
 
 Deque* deque_create(size_t capacity, size_t element_size);
 
-void deque_destory(Deque** deque_p);
+void deque_destroy(Deque** deque_p);
 
 bool deque_push_front(Deque* dq, const void* element_data);
 

@@ -33,7 +33,7 @@ Deque* deque_create(size_t capacity, size_t element_size)
     return dq;
 }
 
-void deque_destory(Deque** deque_p)
+void deque_destroy(Deque** deque_p)
 {
     if(*deque_p && deque_p)
     {
