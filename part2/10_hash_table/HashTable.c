@@ -19,6 +19,7 @@ struct HashTable
 
 
 //----哈希函数：将字符串转换为一个在[0, capacity - 1]范围内的索引
+// a simple hash function for testing
 static size_t hash_function(const char* key, size_t capacity)
 {
     unsigned long hash_value = 0;
@@ -188,6 +189,11 @@ bool ht_remove(HashTable* ht, const char* key)
         - 将桶的头指针 'buckets[4]' 指向 "mane" 的下一个节点"name" 
         - 释放 "mane" 的内存
         - 桶4：-> [("name", "Amy")] -> NULL
+        
+    *[桶的入口] -> Alice -> Bob -> Charile -> David -> NULL
+    * ht->buckets[index] = Alice
+    * current = Alice
+    * 需要 prev 记录 current 前面的指针
     */
    if(!ht || !key)   return false;
 
