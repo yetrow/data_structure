@@ -15,9 +15,9 @@ typedef void (*VisitFunc)(const void* data);
 // 遍历顺序的枚举
 typedef enum 
 {
-    IN_ORDER,       // 中序遍历(LNR -> 结果有序)
-    PRE_ORDER,      // 前序遍历(NLR)
-    POST_ORDER      // 后续遍历(LRN)
+    IN_ORDER,       // 中序遍历(LNR -> 结果有序)     左子树，根节点，右子树
+    PRE_ORDER,      // 前序遍历(NLR)                根节点，左子树，右子树
+    POST_ORDER      // 后序遍历(LRN)                左子树，右子树，根节点
 } TraverseOrder;
 
 // --- Public Api Prototypes ---
@@ -28,7 +28,7 @@ void bst_destroy(BST** bst_p);
 
 bool bst_insert(BST* bst, const void* element_data);
 
-bool bst_remover(BST* bst, const void* element_data);
+bool bst_remove(BST* bst, const void* element_data);
 
 bool bst_search(const BST* bst, const void* key);
 
