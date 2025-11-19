@@ -132,8 +132,8 @@ static Node* _remove_recursive(BST* bst, Node* node, const void* key)
         }
 
         Node* successor = _find_min_recursive(node->right);
-        memcpy(node->data, successor ->data, bst->element_size);
-        node->right = _remove_recursive(bst, node->right, successor);
+        memcpy(node->data, successor->data, bst->element_size);
+        node->right = _remove_recursive(bst, node->right, successor->data);
     }
 
     return node; 
@@ -170,7 +170,7 @@ void bst_destroy(BST** bst_p)
     if(bst_p && *bst_p)
     {
         _destroy_recursive((*bst_p)->root);
-        free(bst_p);
+        free(*bst_p);
         *bst_p = NULL;
     }
 }
@@ -180,7 +180,7 @@ bool bst_insert(BST* bst, const void* element_data)
     if(!bst || !element_data)   return false;
     size_t old_size = bst->size;
     bst->root = _insert_recursive(bst, bst->root, element_data);
-    // 如果size减小了，说明删除成功
+    // 如果size增大了，说明删除成功
     return bst->size > old_size;
 }
 

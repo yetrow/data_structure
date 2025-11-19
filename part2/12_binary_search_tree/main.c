@@ -226,6 +226,7 @@ int main() {
     bst_remove(bst, &key_to_remove);
 
     print_in_order(bst);
+    printf("当前大小: %zu\n", bst_get_size(bst));
 
 
 
@@ -244,6 +245,7 @@ int main() {
     bst_remove(bst, &key_to_remove); // 再删5，此时5应该只有一个孩子
 
     print_in_order(bst);
+    printf("当前大小: %zu\n", bst_get_size(bst));
 
 
 
@@ -256,6 +258,7 @@ int main() {
     bst_remove(bst, &key_to_remove);
 
     print_in_order(bst);
+    printf("当前大小: %zu\n", bst_get_size(bst));
 
 
 
