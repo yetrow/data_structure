@@ -4,9 +4,19 @@
 #include <ctype.h>  // 添加 isdigit() 函数
 #define MAX_SIZE 100
 
+/*
+    Infix   中缀    2 + 3   a + b * c
+    Prefix  前缀    + 2 3   + a * b c
+    Suffix 后缀    2 3 +   a b c * +
+*/
+
+
+
+
+
 typedef struct Node
 {
-    int data;  // 改为 int 类型存储数字值
+    int data;  
     struct Node* next;
 }Node;
 
@@ -38,8 +48,7 @@ int Top(Node* p);  // 返回类型改为 int
 
 int EvaluatePostfix(char exp[]) // exp 是输入的后缀表达式字符串
 {
-    struct Node* stack = NULL; // 初始化一个空栈，用一个 Node* 指针表示栈顶
-    // 链表实现栈时，stack 指针指向链表的头部（即栈顶元素）
+    struct Node* stack = NULL; 
 
     for(int i = 0; i < strlen(exp); i++) // 循环遍历表达式字符串 exp
     {
@@ -92,13 +101,13 @@ int EvaluatePostfix(char exp[]) // exp 是输入的后缀表达式字符串
     while (stack != NULL) {
         stack = Pop(stack);
     }
-    printf("栈已清空.\n"); // 调试信息
+    printf("栈已清空.\n"); 
 
-    return finalResult; // 返回最终结果
+    return finalResult; 
 }
 
 
-int Perform(int num1, char op, int num2)  // 参数和返回类型改为 int
+int Perform(int num1, char op, int num2)  
 {
     switch(op)
     {
@@ -117,7 +126,7 @@ int Perform(int num1, char op, int num2)  // 参数和返回类型改为 int
     }
 }
 
-Node* Push(Node* p, int data)  // data 类型改为 int
+Node* Push(Node* p, int data)  
 {
     Node* temp = (Node*)malloc(sizeof(Node));
     temp->data = data;
@@ -136,7 +145,7 @@ Node* Pop(Node* p)
     return p;
 }
 
-int Top(Node* p)  // 返回类型改为 int
+int Top(Node* p)  
 {
     if(p != NULL)
         return p->data;
