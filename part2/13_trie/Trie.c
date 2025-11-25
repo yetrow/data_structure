@@ -10,7 +10,7 @@
 
 typedef struct TrieNode
 {
-    // 用 void* 替换bool isEndOfWord. NULL表示非单词结尾
+    // 用 void* 替换bool isEndOfWord. NULL表示非单词结尾. 使用void*不仅可以知道是否为结尾，还可以知道它的值
     void* value;
     // 指针数组，数组的每个格子(0~25)，都用来存放指向另一个TireNode的指针
     struct TrieNode* children[ALPHABET_SIZE];
@@ -27,11 +27,12 @@ struct Trie
 // --- 私有函数原型保持不变 --- 
 static TrieNode* TrieNode_Create(void);
 static void TrieNode_DestroyRecursive(TrieNode* node, ValueDestroyer destroyer);
+static bool TrieNode_DeleteRecursiveHelper(TrieNode** pNode, const char* key, int depth, ValueDestroyer destroyer);
 static int CharToIndex(char c);
 
 
 // --- 公共函数实现修改 ---
-Trie* Trie_create(ValueDestroyer destroyer)
+Trie* Trie_Create(ValueDestroyer destroyer)
 {
     Trie* trie =(Trie*)malloc(sizeof(Trie));
     if(!trie)   return NULL;
@@ -48,7 +49,7 @@ Trie* Trie_create(ValueDestroyer destroyer)
     return trie;
 }
 
-void Trie_destroy(Trie* trie)
+void Trie_Destroy(Trie* trie)
 {
     if(trie)
     {
@@ -59,11 +60,11 @@ void Trie_destroy(Trie* trie)
 }
 
 bool Trie_Insert(Trie* trie, const char* key, void* value)
-// trie 指向Trie实例的指针，key 要插入的键(单词)，value 指向要存储的值的指针，如果一个键已存在，其旧值将被覆盖
+// trie 指向Trie实例的指针，key 要插入的键(单词)，value 指向要存储的值的指针，如果一个键已存在，其旧值将被覆盖(释放旧值需要用户自己管理)
 {
     if(!trie || !key || !value)  return false;
 
-    assert(value = NULL && "Cannot insert a NULL value into the Trie.");
+    // assert(value = NULL && "Cannot insert a NULL value into the Trie.");
 
     // crawl指针用于遍历Tried "爬行指针"
     TrieNode* crawl = trie->root;
@@ -104,7 +105,7 @@ void* Trie_Search(const Trie* trie, const char* key)
             return NULL;
         }
         // 前进道下一个节点
-        crawl = crawl->children;
+        crawl = crawl->children[index];
     }
 
     // 返回存储的值的指针，如果不是一个结尾(即值为NULL)，则返回NULL
@@ -112,7 +113,7 @@ void* Trie_Search(const Trie* trie, const char* key)
 }
 
 // StartWith 的实现基本不变
-bool Trie_StartWith(const Trie* trie, const char* prefix)
+bool Trie_StartsWith(const Trie* trie, const char* prefix)
 {
     if(!trie || !trie->root || !prefix) return false;
     const TrieNode* crawl = trie->root;
@@ -121,7 +122,7 @@ bool Trie_StartWith(const Trie* trie, const char* prefix)
     for(size_t i = 0; i < len; ++i)
     {
         int index = CharToIndex(prefix[i]);
-        if(index == -1 || !crawl->children[i])  return false;
+        if(index == -1 || !crawl->children[index])  return false;
         crawl = crawl->children[index];
     }
     return crawl != NULL;
@@ -133,7 +134,7 @@ void Trie_Delete(Trie* trie, const char* key)
     {
         return ;
     }
-    TrieNode_DeleteRecursiveHelper(&trie->root, key, '0', trie->valueDestroyer);
+    TrieNode_DeleteRecursiveHelper(&trie->root, key, 0, trie->valueDestroyer);
 }
 
 static bool IsNodeEmpty(TrieNode* node)
@@ -142,6 +143,12 @@ static bool IsNodeEmpty(TrieNode* node)
     {
         return false;
     }
+
+    for (int i = 0; i < ALPHABET_SIZE; i++) 
+    {
+        if (node->children[i])  return false;
+    }
+    return true;
 }
 
 
@@ -159,6 +166,11 @@ static TrieNode* TrieNode_Create(void)
             node->children[i] = NULL;
         }
     }
+
+    // 甚至不需要 if(node) 判断，直接返回即可（如果失败会返回NULL）
+    // 参数是1 ：因为我们需要创建1个节点，这1个节点中children就已经包含了26个格子
+    // TrieNode* node = (TrieNode*)calloc(1, sizeof(TrieNode));
+
     return node;
 }
 
@@ -178,6 +190,64 @@ static void TrieNode_DestroyRecursive(TrieNode* node, ValueDestroyer destroyer)
         destroyer(node->value);
     }
     free(node);
+}
+
+static bool TrieNode_DeleteRecursiveHelper(TrieNode** pNode, const char* key, int depth, ValueDestroyer destroyer) 
+    {
+	// TrieNode** pNode: &l->children['e'];
+	// TrieNode* node = *pNode; : node 现在是'e'节点的地址
+
+	// 获取当前节点
+    TrieNode* node = *pNode;
+
+    if (!node) 
+    {
+        return false; // 键不存在
+    }
+
+    // key[5] \0
+    // 如果到达了键的末尾
+    if (key[depth] == '\0') 
+    {
+        // 如果这个节点确实是一个单词的结尾
+        if (node->value) 
+        {
+            if (destroyer) 
+            {
+                destroyer(node->value);
+            }
+			// node->isEndOfWord = false; // 不是单词结尾
+            node->value = NULL; // 懒删除：标记为非结尾
+        }
+        // 检查这个节点现在是否可以被物理删除
+        if (IsNodeEmpty(node))
+        {
+            free(node);
+            *pNode = NULL; // 将父节点指向此节点的指针设为NULL
+
+            return true;
+        }
+
+        return false;
+    }
+    // 递归到下一个节点
+    int index = CharToIndex(key[depth]);
+    if (index == -1) return false; // 无效字符
+
+    if (TrieNode_DeleteRecursiveHelper(&node->children[index], key, depth + 1, destroyer)) 
+    {
+        // 如果子节点被删除了，再次检查当前节点是否也变为空了
+        if (IsNodeEmpty(node)) 
+        {
+            free(node);
+            *pNode = NULL;
+
+            return true;
+        }
+    }
+
+    return false;
+
 }
 
 static int CharToIndex(char c)

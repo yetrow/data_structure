@@ -16,4 +16,6 @@ bool Trie_Insert(Trie* trie, const char* key, void* value);
 
 void* Trie_Search(const Trie* trie, const char* key);
 
-bool Trie_Startswitch(const Trie* trie, const char* prefix);
+bool Trie_StartsWith(const Trie* trie, const char* prefix);
+
+void Trie_Delete(Trie* trie, const char* key);
