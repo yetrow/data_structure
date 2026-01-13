@@ -38,7 +38,5 @@ int array_insert(DynamicArray* arr, size_t index, Data value);
 // 删除指定索引的元素
 int array_delete(DynamicArray* arr, size_t index);
 
-// void print_array(DynamicArray* arr);
-// print函数因为定义的类型可能不一样，有的是数字，有的是字符串
-// 万能打印函数
-void print_array(const DynamicArray* arr, void (*print_func)(const void* data));
+
+void print_array(DynamicArray* arr);
