@@ -31,7 +31,7 @@ Data *array_read(DynamicArray* arr, size_t index);
 
 // 更新指定索引元素
 // 返回0成功，返回-1失败
-int array_updata(DynamicArray* arr, size_t index, Data value);
+int array_update(DynamicArray* arr, size_t index, Data value);
 
 int array_insert(DynamicArray* arr, size_t index, Data value);
 

@@ -47,7 +47,7 @@ int main(void)
     Data new_value = 999;
     printf("将索引 %zu 的值从 %d 更新为 %d \n", update_index, *array_read(my_array, update_index), new_value);
 
-    array_updata(my_array, update_index, new_value);
+    array_update(my_array, update_index, new_value);
     print_array(my_array);
 
     // === 4. 插入
