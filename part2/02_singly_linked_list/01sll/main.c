@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+// #include <stdbool.h>
 
 typedef struct Node
 {
@@ -23,9 +24,16 @@ Node *createNode(int data)
     newNode->next = NULL;
 }
 
+// 末尾追加函数
 // headRef是指向head指针的指针
 // 这样我们才能在链表为空的时候修改head
-void list_append(Node **headRef, int data) // 末尾追加函数
+// 函数参数永远是值传递
+// 如果你想在函数中修改某个变量，就必须把“那个变量的地址”传进去
+
+// 某个指针 = 新地址;
+// ✔   有 ，参数必须是             二级指针
+// ❌ 没有，只是 指针->成员 = ... → 一级指针
+void list_append(Node **headRef, int data) 
 {
     Node *newNode = createNode(data);
     if (newNode == NULL)
@@ -45,7 +53,8 @@ void list_append(Node **headRef, int data) // 末尾追加函数
     last->next = newNode;
 }
 
-void prepenNode(Node **headRef, int data) // 头结点追加
+// 头结点追加函数
+void prepenNode(Node **headRef, int data) 
 {
     Node *newNode = createNode(data);
     newNode->next = *headRef;
@@ -92,6 +101,7 @@ void updateNode(Node *head, int oldData, int newData)
     }
 }
 
+// 时间复杂度是 O(n)
 void deleteNode(Node **headRef, int data)
 {
     Node *temp = *headRef;
@@ -119,6 +129,40 @@ void deleteNode(Node **headRef, int data)
     prev->next = temp->next;
     free(temp);
 }
+
+// bool deleteAt(Node **headRef, int pos)
+// {
+//     if (*headRef == NULL || pos <= 0)
+//         return false;
+
+//     Node *temp = *headRef;
+
+//     // 删除头结点
+//     if (pos == 1)
+//     {
+//         *headRef = temp->next;
+//         free(temp);
+//         return true;
+//     }
+
+//     Node *prev = NULL;
+//     int index = 1;
+
+//     while (temp != NULL && index < pos)
+//     {
+//         prev = temp;
+//         temp = temp->next;
+//         index++;
+//     }
+
+//     if (temp == NULL)
+//         return false;
+
+//     prev->next = temp->next;
+//     free(temp);
+//     return true;
+// }
+
 
 void list_free(Node **headRef)
 {

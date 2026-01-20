@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "dynamic_array.h"
+#include "DynamicArray.h"
 
 // void print_array(DynamicArray *arr)
 // {

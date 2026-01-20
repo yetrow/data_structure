@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS // 忽视vs的一些字符串的sb警告，写在最上边
-#include "dynamic_array.h"
+#include "DynamicArray.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
