@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <stdbool.h>
+#include <stdbool.h>
 
 typedef struct Node
 {
@@ -87,6 +87,23 @@ Node *findNode(Node *head, int data)
     return NULL;
 }
 
+// 按位查找函数 (1-based index)
+Node *findNodeByIndex(Node *head, int index)
+{
+    Node *current = head;
+    int count = 1; // 1-based index
+    while (current != NULL)
+    {
+        if (count == index)
+        {
+            return current;
+        }
+        current = current->next;
+        count++;
+    }
+    return NULL; // 未找到或索引超出范围
+}
+
 void updateNode(Node *head, int oldData, int newData)
 {
     Node *temp = findNode(head, oldData);
@@ -130,38 +147,39 @@ void deleteNode(Node **headRef, int data)
     free(temp);
 }
 
-// bool deleteAt(Node **headRef, int pos)
-// {
-//     if (*headRef == NULL || pos <= 0)
-//         return false;
+// 按位删除
+bool deleteAt(Node **headRef, int pos)
+{
+    if (*headRef == NULL || pos <= 0)
+        return false;
 
-//     Node *temp = *headRef;
+    Node *temp = *headRef;
 
-//     // 删除头结点
-//     if (pos == 1)
-//     {
-//         *headRef = temp->next;
-//         free(temp);
-//         return true;
-//     }
+    // 删除头结点
+    if (pos == 1)
+    {
+        *headRef = temp->next;
+        free(temp);
+        return true;
+    }
 
-//     Node *prev = NULL;
-//     int index = 1;
+    Node *prev = NULL;
+    int index = 1;
 
-//     while (temp != NULL && index < pos)
-//     {
-//         prev = temp;
-//         temp = temp->next;
-//         index++;
-//     }
+    while (temp != NULL && index < pos)
+    {
+        prev = temp;
+        temp = temp->next;
+        index++;
+    }
 
-//     if (temp == NULL)
-//         return false;
+    if (temp == NULL)
+        return false;
 
-//     prev->next = temp->next;
-//     free(temp);
-//     return true;
-// }
+    prev->next = temp->next;
+    free(temp);
+    return true;
+}
 
 
 void list_free(Node **headRef)
