@@ -54,6 +54,7 @@ static void _destroy_recursive(Node* node)
 // 私有辅助函数：递归插入新节点
 static Node* _insert_recursive(BST* bst, Node* node, const void* data)
 {
+    // 基本情况：如果当前节点为空，说明我们找到了插入位置
      if(node == NULL)
      {
         bst->size++;
@@ -64,6 +65,7 @@ static Node* _insert_recursive(BST* bst, Node* node, const void* data)
 
      if(cmp < 0)
      {
+        // 新数据比当前节点小，递归地插入到左子树
         node->left = _insert_recursive(bst, node->left, data);
      }
      else if(cmp > 0)

@@ -146,10 +146,13 @@ bool prepend(DoublyLinkedList *list, Song songData)
     else
     {
         // 链表非空时，将新节点添加到尾部
-        newNode->next = list->head; // 新节点的next指向当前头结点
+        // 新节点的next指向当前头结点
+        newNode->next = list->head; 
         // newNode->prev = NULL;
-        list->head->prev = newNode; // 当前头节点的prev指向新节点
-        list->head = newNode;       // 更新头结点为新节点
+        // 当前头节点的prev指向新节点
+        list->head->prev = newNode; 
+        // 更新头结点为新节点
+        list->head = newNode;
     }
     list->size++;
     return true;

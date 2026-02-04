@@ -2,13 +2,13 @@
 
 ##### 一.平衡因子
 
-1. BalanceFactor(node) = Height(node.left) - Height(node.right)
+1. ***BalanceFactor(node) = Height(node.left) - Height(node.right)***
 
-2. BF = 1(平衡因子)
+2. **BF = 1(平衡因子)**
 
-   BF = 0
+   **BF = 0**
 
-   BF = -1
+   **BF = -1**
 
 ##### 二. 高度 Height
 
@@ -26,13 +26,13 @@
 
    1. 空节点 NULL 高度为 -1
    2. 叶子节点高度为 0
-   3. 计算公式**Height(n) = 1 + max(height(N.leftchild), height(N.rightChild)))**
+   3. 计算公式**Height(n) = 1 + max(height(N.leftchild), height(N.rightChild))**
 
 5. 高度从 **1** 开始定义
 
    1. 空节点高度为 0
    2. 叶子节点高度为 1 
-   3. 计算公式**Height(n) = 1 + max(height(N.leftchild), height(N.rightChild)))**
+   3. 计算公式**Height(n) = 1 + max(height(N.leftchild), height(N.rightChild))**
 
 
 
@@ -62,12 +62,16 @@
 2. 对于任何一颗树，根节点的深度最小为 0 ，而其高度则最大
 3. 叶子节点的深度最大，高度最少，为 0 或 1（取决于你的定义）
 
-##### 旋转
+#### 旋转
 
 1. 旋转(Rotation) 旋转是一系列针对二叉搜索树中节点指针的重新赋值操作。其目的是在保持二叉搜索树性质不变的前提下，改变特定节点在树中的深度(depth)，以满足自平衡树的高度平衡标准。这是一种局部操作，仅影响少量节点及其直接子节点。
 
 2. 失去平衡Root根节点：从新插入节点向上回溯时，第一个发现其平衡因子变为+2或-2的节点。    
    
 3. Pivot(枢轴/旋转轴心)：这通常是Root节点的子节点，并且位于走向新插入节点的路径上。在旋转过程中，Pivot或其子节点将“旋转”到Root的位置，成为新的子树根节点。
-    
-4. 二叉搜索树性质(Binary Search Tree Property)严格遵守的规则。对于树中的任意节点N：其左子树所有节点的键值(key)都小于或等于N的键值。其右子树中所有节点的键值都大于N的键值。单次旋转(Single Rotation)单次旋转是基础的结构调整操作。
+   
+4. 二叉搜索树性质(Binary Search Tree Property)严格遵守的规则。对于树中的任意节点N：**其左子树所有节点的键值(key)都小于或等于N的键值。其右子树中所有节点的键值都大于N的键值**。单次旋转(Single Rotation)单次旋转是基础的结构调整操作。
+
+
+![](pictures\Tree_Rebalancing.gif)
+

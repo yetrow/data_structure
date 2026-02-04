@@ -1,10 +1,8 @@
 
 #include "BST.h"
 #include <stdio.h>
+
 /*
-
-
-
  * 二叉搜索树 (BST) 模块构建
 
 
@@ -120,21 +118,17 @@
 
 
 // --- 用户定义的比较和访问函数 ---
-
 // 比较两个整数
 
 int compare_int(const void* a, const void* b) {
 
     int int_a = *(const int*)a;
-
     int int_b = *(const int*)b;
 
     if (int_a < int_b) return -1;
-
     if (int_a > int_b) return 1;
 
     return 0;
-
 }
 
 
