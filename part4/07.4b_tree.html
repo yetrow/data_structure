@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B树 (B-Tree) 原理与 408 考点动画解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        
+        /* SVG 动画过渡样式 */
+        .node { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .edge { transition: all 0.6s ease-in-out; }
+        
+        /* 节点基础样式 */
+        .node-rect {
+            fill: #ffffff;
+            stroke: #3b82f6;
+            stroke-width: 2px;
+            rx: 6px; /* 圆角 */
+            transition: all 0.5s ease;
+        }
+        .node-separator {
+            stroke: #94a3b8;
+            stroke-width: 1px;
+            stroke-dasharray: 2 2;
+        }
+        .node-text { fill: #1e293b; font-weight: bold; font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+        
+        /* 高亮状态 (对应算法操作) */
+        .node.active .node-rect { fill: #fef08a; stroke: #eab308; stroke-width: 3px; }
+        .node.overflow .node-rect { fill: #fee2e2; stroke: #ef4444; stroke-width: 3px; } /* 溢出警告 */
+        .node.underflow .node-rect { fill: #ffedd5; stroke: #f97316; stroke-width: 3px; } /* 下溢警告 */
+        .node.secondary .node-rect { fill: #e0e7ff; stroke: #6366f1; stroke-width: 3px; }
+        .node.success .node-rect { fill: #dcfce7; stroke: #22c55e; stroke-width: 3px; }
+        
+        .edge-line { stroke: #cbd5e1; stroke-width: 2px; fill: none; transition: all 0.6s ease; }
+        .edge-line.highlight { stroke: #3b82f6; stroke-width: 4px; }
+
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题区 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10 flex flex-wrap justify-between items-start gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                🌳 B树 (B-Tree) 动态图解 <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408统考专版</span>
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">深度还原节点溢出分裂、下溢合并的完整过程</p>
+        </div>
+        
+        <!-- 408 核心考点面板 -->
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700 max-w-xl shadow-inner">
+            <h3 class="font-bold text-blue-700 mb-1">🔥 408 考研核心定则 (m 阶 B 树)：</h3>
+            <ul class="list-disc list-inside grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                <li><span class="font-bold text-red-600">根节点</span>关键字数：1 ≤ n ≤ m-1</li>
+                <li><span class="font-bold text-red-600">非根节点</span>关键字数：⌈m/2⌉ - 1 ≤ n ≤ m-1</li>
+                <li>任何节点的子树数量 k 满足：k = n + 1</li>
+                <li>所有<span class="font-bold">叶子节点</span>均在同一层 (绝对平衡)</li>
+                <li><span class="font-bold">插入溢出：</span>当关键字达到 m 个时，提取 ⌈m/2⌉ 位置的元素上移。</li>
+                <li><span class="font-bold">删除下溢：</span>不够借时，与兄弟及父节点元素<span class="font-bold">合并</span>。</li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-[1500px] w-full mx-auto p-4 flex flex-col lg:flex-row gap-4 h-[calc(100vh-120px)]">
+        
+        <!-- 左侧控制台 -->
+        <aside class="w-full lg:w-96 flex flex-col gap-4">
+            
+            <!-- 操作面板 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="font-bold text-slate-700 flex items-center gap-2">🕹️ 树操作</h2>
+                    <div class="flex items-center gap-2 text-sm">
+                        <label for="order-select" class="font-medium text-slate-600">阶数(m):</label>
+                        <select id="order-select" class="border border-slate-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500" onchange="changeOrder()">
+                            <option value="3">3 阶 (2-3树)</option>
+                            <option value="4" selected>4 阶 (2-3-4树)</option>
+                            <option value="5">5 阶</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 mb-4">
+                    <input type="number" id="node-value" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="输入整数 (如 15)" />
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="handleInsert()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition shadow-sm">插入元素</button>
+                    <button onclick="handleDelete()" class="bg-slate-700 hover:bg-slate-800 text-white py-2 rounded-lg font-medium transition shadow-sm">删除元素</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="randomTree()" class="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 py-2 rounded-lg text-sm font-medium transition">随机生成 B 树</button>
+                    <button onclick="resetTree()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition">清空</button>
+                </div>
+            </div>
+
+            <!-- 播放控制台 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h2 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">⏯️ 动画控制</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <button onclick="prevStep()" id="btn-prev" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center">
+                        ▶ 自动播放
+                    </button>
+                    <button onclick="nextStep()" id="btn-next" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                <input type="range" id="speed-slider" min="300" max="2500" value="1200" class="w-full" style="direction: rtl;">
+                <div class="text-center text-xs font-bold text-slate-500 mt-2 bg-slate-100 rounded-full py-1" id="step-counter">等待操作...</div>
+            </div>
+
+            <!-- ★ 核心算法解说区 ★ -->
+            <div class="bg-slate-800 rounded-xl shadow-lg border border-slate-700 p-5 flex-1 flex flex-col min-h-[250px]">
+                <h2 class="font-bold text-slate-200 mb-3 border-b border-slate-600 pb-2 flex justify-between items-center">
+                    <span>💡 步骤逻辑解析</span>
+                    <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300" id="m-indicator">当前: m=4, 最大键=3</span>
+                </h2>
+                <div id="explanation-box" class="text-slate-300 text-[15px] leading-relaxed overflow-y-auto no-scrollbar flex-1 space-y-3">
+                    请在上方输入数字并点击“插入元素”，开始观察B树的动态构建过程。
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧画布区 -->
+        <main class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative" id="canvas-container">
+            <!-- 移动端友好的视图控制面板 -->
+            <div class="absolute top-4 left-4 flex flex-col gap-1 bg-white/95 p-2 rounded-lg shadow-md border border-slate-200 z-10 opacity-90 hover:opacity-100 transition">
+                <div class="text-[10px] text-slate-400 text-center mb-1">视图控制</div>
+                <div class="flex justify-center gap-1">
+                    <button onclick="panView(0, -150)" class="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 shadow-sm">⬆️</button>
+                </div>
+                <div class="flex justify-center gap-1">
+                    <button onclick="panView(-150, 0)" class="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 shadow-sm">⬅️</button>
+                    <button onclick="resetView()" class="w-8 h-8 flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded shadow-sm" title="重置视图">O</button>
+                    <button onclick="panView(150, 0)" class="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 shadow-sm">➡️</button>
+                </div>
+                <div class="flex justify-center gap-1">
+                    <button onclick="panView(0, 150)" class="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 shadow-sm">⬇️</button>
+                </div>
+                <div class="flex justify-center gap-1 mt-2 pt-2 border-t border-slate-200">
+                    <button onclick="zoomView(0.8)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 font-medium text-xs shadow-sm">➕ 放大</button>
+                    <button onclick="zoomView(1.25)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 font-medium text-xs shadow-sm">➖ 缩小</button>
+                </div>
+            </div>
+            <!-- SVG画布 -->
+            <svg id="tree-svg" class="w-full h-full cursor-grab active:cursor-grabbing" viewBox="-500 -50 1000 700" preserveAspectRatio="xMidYMin meet">
+                <g id="edges-layer"></g>
+                <g id="nodes-layer"></g>
+            </svg>
+        </main>
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. B树核心算法结构与逻辑
+ * ========================================================================= */
+let globalNodeId = 1;
+
+class BTreeNode {
+    constructor(isLeaf = true) {
+        this.uid = globalNodeId++; // 用于DOM动画追踪
+        this.keys = [];            // 关键字数组
+        this.children = [];        // 子节点数组 (长度 = keys.length + 1)
+        this.isLeaf = isLeaf;
+    }
+}
+
+class BTree {
+    constructor(m = 4) {
+        this.m = m;
+        this.maxKeys = m - 1;
+        this.minKeys = Math.ceil(m / 2) - 1; // 408定义：非根节点至少 ceil(m/2)-1 个关键字
+        this.root = new BTreeNode(true);
+        this.steps = []; // 存储动画快照
+    }
+
+    // 录制快照：深拷贝树的状态
+    cloneNode(node) {
+        if (!node) return null;
+        const copy = { uid: node.uid, keys: [...node.keys], isLeaf: node.isLeaf };
+        copy.children = node.children.map(child => this.cloneNode(child));
+        return copy;
+    }
+
+    snapshot(msg, stateClassMap = {}) {
+        // stateClassMap: { [uid]: 'active' | 'overflow' | 'underflow' | 'secondary' | 'success' }
+        this.steps.push({
+            root: this.cloneNode(this.root),
+            msg: msg,
+            states: stateClassMap
+        });
+    }
+
+    /* =======================================
+     * 插入操作 (Bottom-Up 方式，符合考研大纲思维)
+     * ======================================= */
+    insert(val) {
+        this.steps = [];
+        this.snapshot(`🌱 <strong>准备插入 ${val}</strong><br>开始从根节点寻找合适的叶子节点位置...`);
+        
+        let path = []; // 记录从根到叶子的路径，用于回溯分裂
+        let curr = this.root;
+
+        // 1. 寻找叶子节点
+        while (!curr.isLeaf) {
+            path.push(curr);
+            let i = 0;
+            while (i < curr.keys.length && val > curr.keys[i]) i++;
+            if (i < curr.keys.length && val === curr.keys[i]) {
+                this.snapshot(`❌ <strong>插入失败</strong>: B树不允许存在重复的关键字 ${val}。`, { [curr.uid]: 'overflow' });
+                return this.steps;
+            }
+            this.snapshot(`🔍 <strong>向下查找</strong>: 目标 ${val}，经判定进入第 ${i+1} 个分支。`, { [curr.uid]: 'active' });
+            curr = curr.children[i];
+        }
+
+        // 检查叶子中是否重复
+        if (curr.keys.includes(val)) {
+            this.snapshot(`❌ <strong>插入失败</strong>: B树不允许存在重复的关键字 ${val}。`, { [curr.uid]: 'overflow' });
+            return this.steps;
+        }
+
+        // 2. 插入到叶子节点
+        curr.keys.push(val);
+        curr.keys.sort((a, b) => a - b);
+        this.snapshot(`✅ <strong>叶节点插入</strong>: 关键字 ${val} 成功插入叶子节点。`, { [curr.uid]: 'success' });
+
+        // 3. 检查溢出并向上分裂
+        this.handleOverflow(curr, path);
+        return this.steps;
+    }
+
+    handleOverflow(node, path) {
+        // 如果关键字数达到了 m，发生溢出 (标准定义：maxKeys = m-1)
+        if (node.keys.length > this.maxKeys) {
+            this.snapshot(`⚠️ <strong>发现溢出 (Overflow)</strong><br>节点关键字数达到了 ${this.m} 个，超过了上限 ${this.maxKeys}！<br>准备进行<strong>分裂</strong>操作。`, { [node.uid]: 'overflow' });
+
+            // 提取中间元素：索引为 ceil(m/2)-1
+            let midIndex = Math.ceil(this.m / 2) - 1;
+            let promotedKey = node.keys[midIndex];
+
+            // 创建右侧新兄弟节点
+            let rightNode = new BTreeNode(node.isLeaf);
+            rightNode.keys = node.keys.splice(midIndex + 1);
+            if (!node.isLeaf) {
+                rightNode.children = node.children.splice(midIndex + 1);
+            }
+            
+            // 当前节点变为左半部分 (抛弃要上提的 midKey)
+            node.keys.pop(); 
+
+            this.snapshot(`✂️ <strong>分裂节点</strong><br>提取中间关键字 <strong>${promotedKey}</strong> 准备上移。<br>原节点分裂为左右两个新节点。`, { [node.uid]: 'secondary', [rightNode.uid]: 'secondary' });
+
+            // 上移至父节点
+            if (path.length === 0) {
+                // 已经到达根节点，树拔高一层
+                let newRoot = new BTreeNode(false);
+                newRoot.keys = [promotedKey];
+                newRoot.children = [node, rightNode];
+                this.root = newRoot;
+                this.snapshot(`👑 <strong>树高增加</strong><br>由于根节点分裂，产生新的根节点 <strong>${promotedKey}</strong>，B树高度整体 +1！`, { [newRoot.uid]: 'success' });
+            } else {
+                let parent = path.pop();
+                // 找到父节点中插入 promotedKey 的位置
+                let insertIdx = 0;
+                while (insertIdx < parent.keys.length && promotedKey > parent.keys[insertIdx]) insertIdx++;
+                
+                parent.keys.splice(insertIdx, 0, promotedKey);
+                parent.children.splice(insertIdx + 1, 0, rightNode);
+                
+                this.snapshot(`⏫ <strong>关键字上移</strong><br>中间关键字 <strong>${promotedKey}</strong> 上移到了父节点。将继续检查父节点是否溢出。`, { [parent.uid]: 'active' });
+
+                // 递归检查父节点是否溢出
+                this.handleOverflow(parent, path);
+            }
+        } else {
+            this.snapshot(`🏁 <strong>平衡检查完毕</strong><br>树结构满足 ${this.m} 阶 B 树的所有性质，操作结束！`);
+        }
+    }
+
+    /* =======================================
+     * 删除操作 (完整实现借位与合并)
+     * ======================================= */
+    delete(val) {
+        this.steps = [];
+        this.snapshot(`🗑️ <strong>准备删除 ${val}</strong><br>开始寻找目标关键字...`);
+        let path = [];
+        let curr = this.root;
+        let targetIdx = -1;
+
+        // 1. 寻找目标
+        while (curr) {
+            let i = 0;
+            while (i < curr.keys.length && val > curr.keys[i]) i++;
+            if (i < curr.keys.length && val === curr.keys[i]) {
+                targetIdx = i;
+                break;
+            }
+            path.push(curr);
+            curr = curr.isLeaf ? null : curr.children[i];
+        }
+
+        if (!curr) {
+            this.snapshot(`❌ <strong>删除失败</strong>: B树中不存在关键字 ${val}。`);
+            return this.steps;
+        }
+
+        this.snapshot(`🎯 <strong>找到目标</strong><br>在节点中锁定了关键字 <strong>${val}</strong>。`, { [curr.uid]: 'active' });
+
+        // 2. 如果不是叶子节点，寻找前驱(左子树最大值)进行替换
+        if (!curr.isLeaf) {
+            let predNode = curr.children[targetIdx];
+            let predPath = [...path, curr];
+            while (!predNode.isLeaf) {
+                predPath.push(predNode);
+                predNode = predNode.children[predNode.children.length - 1];
+            }
+            let predKey = predNode.keys[predNode.keys.length - 1];
+            
+            this.snapshot(`🔄 <strong>内节点替换</strong><br>目标在内部节点，寻找其<strong class="text-blue-400">前驱节点</strong>（左子树最大值 ${predKey}）进行值替换。`, { [curr.uid]: 'active', [predNode.uid]: 'secondary' });
+            
+            curr.keys[targetIdx] = predKey;
+            predNode.keys[predNode.keys.length - 1] = val; // 换到底部准备删
+            
+            this.snapshot(`✨ <strong>替换完成</strong><br>现在转化为了删除叶子节点中的关键字 ${val}。`, { [predNode.uid]: 'overflow' });
+            
+            curr = predNode;
+            targetIdx = predNode.keys.length - 1;
+            path = predPath;
+        }
+
+        // 3. 在叶子节点中删除目标
+        curr.keys.splice(targetIdx, 1);
+        this.snapshot(`✂️ <strong>物理删除</strong><br>已从叶子节点移除关键字。接下来进行下溢检查...`, { [curr.uid]: 'success' });
+
+        // 4. 检查下溢并向上修复
+        this.handleUnderflow(curr, path);
+        return this.steps;
+    }
+
+    handleUnderflow(node, path) {
+        // 根节点特殊处理
+        if (node === this.root) {
+            if (node.keys.length === 0 && !node.isLeaf) {
+                this.root = node.children[0];
+                this.snapshot(`📉 <strong>树高减少</strong><br>根节点被清空，其唯一的子节点晋升为新根，B树高度 -1！`, { [this.root.uid]: 'success' });
+            } else if (node.keys.length === 0 && node.isLeaf) {
+                // 树彻底空了
+                this.snapshot(`🏁 <strong>树已清空</strong>。`);
+            } else {
+                this.snapshot(`🏁 <strong>平衡检查完毕</strong><br>操作结束！`);
+            }
+            return;
+        }
+
+        // 如果未发生下溢
+        if (node.keys.length >= this.minKeys) {
+            this.snapshot(`🏁 <strong>平衡检查完毕</strong><br>节点关键字数满足条件 (≥ ${this.minKeys})，操作结束！`);
+            return;
+        }
+
+        this.snapshot(`⚠️ <strong>发生下溢 (Underflow)</strong><br>节点关键字数量只剩 ${node.keys.length} 个，低于下限 ${this.minKeys}！<br>需要<strong>向兄弟借位</strong>或<strong>合并</strong>。`, { [node.uid]: 'underflow' });
+
+        let parent = path[path.length - 1];
+        let idx = parent.children.indexOf(node);
+        let leftSibling = idx > 0 ? parent.children[idx - 1] : null;
+        let rightSibling = idx < parent.children.length - 1 ? parent.children[idx + 1] : null;
+
+        // 尝试向左兄弟借
+        if (leftSibling && leftSibling.keys.length > this.minKeys) {
+            this.snapshot(`🤝 <strong>向左兄弟借位 (右旋)</strong><br>左兄弟比较富裕。将父节点关键字 <strong>${parent.keys[idx - 1]}</strong> 降入本节点，左兄弟的最大关键字 <strong>${leftSibling.keys[leftSibling.keys.length - 1]}</strong> 升入父节点。`, { [node.uid]: 'active', [leftSibling.uid]: 'secondary', [parent.uid]: 'secondary' });
+            
+            node.keys.unshift(parent.keys[idx - 1]);
+            parent.keys[idx - 1] = leftSibling.keys.pop();
+            if (!node.isLeaf) node.children.unshift(leftSibling.children.pop());
+            
+            this.snapshot(`✨ <strong>借位完成</strong><br>节点恢复平衡。`, { [node.uid]: 'success' });
+            return;
+        }
+        
+        // 尝试向右兄弟借
+        if (rightSibling && rightSibling.keys.length > this.minKeys) {
+            this.snapshot(`🤝 <strong>向右兄弟借位 (左旋)</strong><br>右兄弟比较富裕。将父节点关键字 <strong>${parent.keys[idx]}</strong> 降入本节点，右兄弟的最小关键字 <strong>${rightSibling.keys[0]}</strong> 升入父节点。`, { [node.uid]: 'active', [rightSibling.uid]: 'secondary', [parent.uid]: 'secondary' });
+            
+            node.keys.push(parent.keys[idx]);
+            parent.keys[idx] = rightSibling.keys.shift();
+            if (!node.isLeaf) node.children.push(rightSibling.children.shift());
+            
+            this.snapshot(`✨ <strong>借位完成</strong><br>节点恢复平衡。`, { [node.uid]: 'success' });
+            return;
+        }
+
+        // 兄弟都不够借，必须合并
+        if (leftSibling) {
+            this.snapshot(`🫂 <strong>与左兄弟合并</strong><br>兄弟都不够借。将本节点、左兄弟、以及父节点中间的关键字 <strong>${parent.keys[idx - 1]}</strong> 合并为一个大节点。`, { [node.uid]: 'underflow', [leftSibling.uid]: 'secondary', [parent.uid]: 'overflow' });
+            
+            leftSibling.keys.push(parent.keys[idx - 1], ...node.keys);
+            if (!node.isLeaf) leftSibling.children.push(...node.children);
+            
+            parent.keys.splice(idx - 1, 1);
+            parent.children.splice(idx, 1);
+            
+            this.snapshot(`✨ <strong>合并完成</strong><br>导致父节点失去了一个关键字，将继续向上检查父节点是否发生下溢。`, { [leftSibling.uid]: 'success', [parent.uid]: 'active' });
+            
+        } else if (rightSibling) {
+            this.snapshot(`🫂 <strong>与右兄弟合并</strong><br>兄弟都不够借。将本节点、右兄弟、以及父节点中间的关键字 <strong>${parent.keys[idx]}</strong> 合并为一个大节点。`, { [node.uid]: 'underflow', [rightSibling.uid]: 'secondary', [parent.uid]: 'overflow' });
+            
+            node.keys.push(parent.keys[idx], ...rightSibling.keys);
+            if (!node.isLeaf) node.children.push(...rightSibling.children);
+            
+            parent.keys.splice(idx, 1);
+            parent.children.splice(idx + 1, 1);
+            
+            this.snapshot(`✨ <strong>合并完成</strong><br>导致父节点失去了一个关键字，将继续向上检查父节点是否发生下溢。`, { [node.uid]: 'success', [parent.uid]: 'active' });
+        }
+
+        path.pop();
+        this.handleUnderflow(parent, path);
+    }
+}
+
+/* =========================================================================
+ * 2. SVG 视图渲染引擎
+ * ========================================================================= */
+let btree = new BTree(4);
+let activeSteps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+const nodesLayer = document.getElementById('nodes-layer');
+const edgesLayer = document.getElementById('edges-layer');
+const explanationBox = document.getElementById('explanation-box');
+
+// 渲染常量配置
+const CELL_W = 45; // 每个关键字格子的宽度
+const CELL_H = 34; // 格子高度
+const V_GAP = 90;  // 层级间的垂直间距
+const H_GAP = 20;  // 节点间的最小水平间距
+
+// 第一遍：计算每个节点分配到的宽度 (后序遍历)
+function calcWidth(node) {
+    if (!node) return 0;
+    // 节点的物理宽度
+    let physicalW = Math.max(1, node.keys.length) * CELL_W; 
+    
+    if (node.isLeaf) {
+        node.w = physicalW + H_GAP;
+    } else {
+        let childrenW = 0;
+        for (let c of node.children) childrenW += calcWidth(c);
+        node.w = Math.max(childrenW, physicalW + H_GAP);
+    }
+    return node.w;
+}
+
+// 第二遍：计算具体坐标 (先序遍历)
+function assignCoords(node, x, y, layoutNodes, layoutEdges) {
+    if (!node) return;
+    
+    let physicalW = Math.max(1, node.keys.length) * CELL_W;
+    node.x = x;
+    node.y = y;
+    
+    layoutNodes.push({ uid: node.uid, keys: node.keys, x: x, y: y, pw: physicalW });
+
+    if (!node.isLeaf) {
+        let currX = x - node.w / 2; // 起始分配点
+        for (let i = 0; i < node.children.length; i++) {
+            let child = node.children[i];
+            let childX = currX + child.w / 2;
+            let childY = y + V_GAP;
+            
+            // 计算连线的起点坐标 (位于节点底部缝隙)
+            let startX;
+            if (node.keys.length === 0) startX = x; // 预防空根
+            else {
+                // 将节点底部分为 keys.length+1 个点
+                startX = (x - physicalW/2) + i * CELL_W;
+            }
+            
+            layoutEdges.push({ 
+                id: `e-${node.uid}-${child.uid}`, 
+                x1: startX, y1: y + CELL_H, 
+                x2: childX, y2: childY 
+            });
+            
+            assignCoords(child, childX, childY, layoutNodes, layoutEdges);
+            currX += child.w;
+        }
+    }
+}
+
+function renderSnapshot(step) {
+    if (!step || !step.root) {
+        nodesLayer.innerHTML = '';
+        edgesLayer.innerHTML = '';
+        explanationBox.innerHTML = step ? step.msg : '';
+        return;
+    }
+
+    const layoutNodes = [];
+    const layoutEdges = [];
+    calcWidth(step.root);
+    assignCoords(step.root, 0, 40, layoutNodes, layoutEdges);
+
+    explanationBox.innerHTML = step.msg;
+
+    // --- 渲染连线 ---
+    const currentEdgeIds = new Set();
+    layoutEdges.forEach(e => {
+        currentEdgeIds.add(e.id);
+        let line = document.getElementById(e.id);
+        if (!line) {
+            line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("id", e.id);
+            line.setAttribute("class", "edge-line");
+            line.setAttribute("x1", e.x1); line.setAttribute("y1", e.y1 - V_GAP/2);
+            line.setAttribute("x2", e.x1); line.setAttribute("y2", e.y1 - V_GAP/2);
+            edgesLayer.appendChild(line);
+        }
+        setTimeout(() => {
+            line.setAttribute("x1", e.x1); line.setAttribute("y1", e.y1);
+            line.setAttribute("x2", e.x2); line.setAttribute("y2", e.y2);
+        }, 20);
+    });
+
+    Array.from(edgesLayer.children).forEach(line => {
+        if (!currentEdgeIds.has(line.id)) {
+            line.style.opacity = "0";
+            setTimeout(() => line.remove(), 500);
+        }
+    });
+
+    // --- 渲染节点 ---
+    const currentNodeIds = new Set();
+    layoutNodes.forEach(n => {
+        currentNodeIds.add(`n-${n.uid}`);
+        let g = document.getElementById(`n-${n.uid}`);
+        
+        let rectWidth = Math.max(CELL_W, n.keys.length * CELL_W);
+        
+        if (!g) {
+            g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("id", `n-${n.uid}`);
+            g.setAttribute("transform", `translate(${n.x}, ${n.y - 30})`);
+            g.style.opacity = "0";
+            
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("class", "node-rect");
+            rect.setAttribute("height", CELL_H);
+            
+            g.appendChild(rect);
+            nodesLayer.appendChild(g);
+        }
+
+        g.style.transition = "opacity 0.4s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)";
+        
+        // 状态应用
+        let stateClass = step.states[n.uid] || '';
+        g.setAttribute("class", `node ${stateClass}`);
+
+        // 更新外框大小和位置(居中)
+        let rect = g.querySelector('.node-rect');
+        rect.setAttribute("x", -rectWidth / 2);
+        rect.setAttribute("y", 0);
+        rect.setAttribute("width", rectWidth);
+
+        // 清理旧的文本和分割线
+        Array.from(g.children).forEach(c => {
+            if (c.tagName !== 'rect') c.remove();
+        });
+
+        // 重新绘制格子分割线和文本
+        let startX = -rectWidth / 2;
+        if(n.keys.length === 0) {
+            // 空节点占位
+            let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("class", "node-text");
+            text.setAttribute("x", 0); text.setAttribute("y", CELL_H / 2);
+            text.textContent = '∅';
+            g.appendChild(text);
+        } else {
+            n.keys.forEach((key, idx) => {
+                // 绘制文本
+                let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("class", "node-text");
+                text.setAttribute("x", startX + idx * CELL_W + CELL_W / 2);
+                text.setAttribute("y", CELL_H / 2 + 1);
+                text.textContent = key;
+                g.appendChild(text);
+
+                // 绘制内部垂直分割线
+                if (idx > 0) {
+                    let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("class", "node-separator");
+                    line.setAttribute("x1", startX + idx * CELL_W); line.setAttribute("y1", 0);
+                    line.setAttribute("x2", startX + idx * CELL_W); line.setAttribute("y2", CELL_H);
+                    g.appendChild(line);
+                }
+            });
+        }
+
+        // 触发坐标移动动画
+        setTimeout(() => {
+            g.setAttribute("transform", `translate(${n.x}, ${n.y})`);
+            g.style.opacity = "1";
+        }, 20);
+    });
+
+    Array.from(nodesLayer.children).forEach(g => {
+        if (!currentNodeIds.has(g.id)) {
+            g.style.opacity = "0";
+            const trans = g.getAttribute("transform");
+            if(trans) {
+                const match = trans.match(/translate\(([^,]+),\s*([^)]+)\)/);
+                if(match) g.setAttribute("transform", `translate(${match[1]}, ${parseFloat(match[2]) + 40})`);
+            }
+            setTimeout(() => g.remove(), 500);
+        }
+    });
+}
+
+/* =========================================================================
+ * 3. 播放与交互控制
+ * ========================================================================= */
+function updateUI() {
+    const total = activeSteps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '等待操作...' : `步骤: ${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停';
+        playBtn.className = 'px-6 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition shadow-sm w-32 flex justify-center';
+    } else {
+        playBtn.innerText = '▶ 自动播放';
+        playBtn.className = 'px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center';
+    }
+
+    document.getElementById('m-indicator').innerText = `当前: m=${btree.m}, 最大键=${btree.m - 1}`;
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < activeSteps.length) {
+        currentStepIdx = idx;
+        renderSnapshot(activeSteps[currentStepIdx]);
+        updateUI();
+    }
+}
+
+function nextStep() {
+    if (currentStepIdx < activeSteps.length - 1) showStep(currentStepIdx + 1);
+    else stopPlay();
+}
+
+function prevStep() {
+    if (currentStepIdx > 0) showStep(currentStepIdx - 1);
+}
+
+function togglePlay() {
+    if(activeSteps.length === 0) return;
+    if (playInterval) {
+        stopPlay();
+    } else {
+        if (currentStepIdx >= activeSteps.length - 1) currentStepIdx = 0;
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value);
+        playInterval = setInterval(nextStep, speed);
+        updateUI();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        updateUI();
+    }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } 
+});
+
+// 操作入口
+function executeOp(opFunc) {
+    stopPlay();
+    const newSteps = opFunc();
+    if (newSteps && newSteps.length > 0) {
+        activeSteps = newSteps;
+        currentStepIdx = 0;
+        showStep(0);
+        togglePlay(); 
+    } else {
+        document.getElementById('node-value').value = '';
+    }
+}
+
+function changeOrder() {
+    stopPlay();
+    const m = parseInt(document.getElementById('order-select').value);
+    btree = new BTree(m);
+    globalNodeId = 1;
+    activeSteps = [{ root: null, msg: `🔄 <strong>树已重置</strong><br>已切换为 ${m} 阶 B 树。`, states: {} }];
+    currentStepIdx = 0;
+    showStep(0);
+}
+
+function handleInsert() {
+    const input = document.getElementById('node-value');
+    const val = parseInt(input.value);
+    if (!isNaN(val)) {
+        executeOp(() => btree.insert(val));
+        input.value = '';
+    }
+}
+
+function handleDelete() {
+    const input = document.getElementById('node-value');
+    const val = parseInt(input.value);
+    if (!isNaN(val)) {
+        executeOp(() => btree.delete(val));
+        input.value = '';
+    }
+}
+
+function resetTree() {
+    stopPlay();
+    btree = new BTree(btree.m);
+    globalNodeId = 1;
+    activeSteps = [{ root: null, msg: "🌳 <strong>B树已清空。</strong><br>请在左侧输入数值并点击插入，开始构建您的 B 树。", states: {} }];
+    currentStepIdx = 0;
+    showStep(0);
+}
+
+// 一键随机生成 N 阶 B 树 (跳过中间冗长动画，直达最终形态)
+function randomTree() {
+    resetTree();
+    const count = 15; // 随机插入 15 个节点
+    let vals = new Set();
+    while(vals.size < count) vals.add(Math.floor(Math.random() * 200) + 1);
+    
+    let lastSteps = [];
+    vals.forEach(v => {
+        lastSteps = btree.insert(v); 
+    });
+    
+    // 只保留最后一次插入的动画片段
+    activeSteps = lastSteps;
+    currentStepIdx = activeSteps.length - 1; 
+    showStep(currentStepIdx);
+    explanationBox.innerHTML = `✅ <strong>随机生成完成</strong><br>已快速生成包含 ${count} 个关键字的 <strong>${btree.m} 阶 B 树</strong>。<br>你可以继续测试插入引发的“节点分裂”，或测试删除引发的“借位与合并”。`;
+}
+
+// 视图控制函数 (移动端友好)
+function panView(dx, dy) {
+    let viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+    svg.setAttribute('viewBox', `${viewBox[0] + dx} ${viewBox[1] + dy} ${viewBox[2]} ${viewBox[3]}`);
+}
+
+function zoomView(factor) {
+    let viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+    let cx = viewBox[0] + viewBox[2] / 2;
+    let cy = viewBox[1] + viewBox[3] / 2;
+    let nw = viewBox[2] * factor;
+    let nh = viewBox[3] * factor;
+    svg.setAttribute('viewBox', `${cx - nw / 2} ${cy - nh / 2} ${nw} ${nh}`);
+}
+
+function resetView() {
+    svg.setAttribute('viewBox', `-500 -50 1000 700`);
+}
+
+// 画布鼠标/触摸拖拽平移功能
+const svg = document.getElementById('tree-svg');
+let isDragging = false, startX, startY, viewBox;
+
+svg.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+    svg.style.cursor = 'grabbing';
+});
+window.addEventListener('mouseup', () => { isDragging = false; svg.style.cursor = 'grab'; });
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = (startX - e.clientX) * 1.5;
+    const dy = (startY - e.clientY) * 1.5;
+    svg.setAttribute('viewBox', `${viewBox[0] + dx} ${viewBox[1] + dy} ${viewBox[2]} ${viewBox[3]}`);
+});
+
+// 增加移动端手指触摸滑动支持
+svg.addEventListener('touchstart', (e) => {
+    if(e.touches.length === 1) {
+        isDragging = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+    }
+}, {passive: true});
+window.addEventListener('touchend', () => { isDragging = false; });
+window.addEventListener('touchmove', (e) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    e.preventDefault(); // 防止触发浏览器默认滚动
+    const dx = (startX - e.touches[0].clientX) * 1.5;
+    const dy = (startY - e.touches[0].clientY) * 1.5;
+    svg.setAttribute('viewBox', `${viewBox[0] + dx} ${viewBox[1] + dy} ${viewBox[2]} ${viewBox[3]}`);
+}, {passive: false});
+
+document.getElementById('node-value').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') handleInsert();
+});
+
+window.onload = () => {
+    resetTree();
+};
+</script>
+</body>
+</html>

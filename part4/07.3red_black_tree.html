@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>红黑树 (Red-Black Tree) 原理与动画解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        
+        /* SVG 动画过渡样式 */
+        .node { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .edge { transition: all 0.6s ease-in-out; }
+        
+        /* 节点基础样式 */
+        .node circle {
+            stroke-width: 3px;
+            transition: fill 0.5s ease, stroke 0.5s ease;
+        }
+        .node.RED circle { fill: #ef4444; stroke: #b91c1c; }
+        .node.BLACK circle { fill: #1f2937; stroke: #030712; }
+        
+        .node text.val { fill: #ffffff; font-weight: bold; font-size: 16px; text-anchor: middle; dominant-baseline: central; }
+        
+        /* 高亮状态：当前操作节点、相关节点 */
+        .node.active circle { stroke: #fde047; stroke-width: 5px; stroke-dasharray: 4; animation: spin-border 4s linear infinite; }
+        .node.secondary circle { stroke: #3b82f6; stroke-width: 4px; }
+        
+        @keyframes spin-border { 100% { stroke-dashoffset: 24; } }
+
+        .edge-line { stroke: #94a3b8; stroke-width: 2px; fill: none; transition: all 0.6s ease; }
+        .edge-line.highlight { stroke: #3b82f6; stroke-width: 4px; }
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .rule-box li { margin-bottom: 0.25rem; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题区 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10 flex flex-wrap justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                🍁 红黑树 (Red-Black Tree) 动画图解
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">深入理解变色、左旋、右旋的每一步原理</p>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-600 flex gap-6">
+            <ul class="rule-box list-decimal list-inside">
+                <li class="font-bold text-slate-700 mb-1">红黑树五大性质：</li>
+                <li>节点非红即黑。</li>
+                <li>根节点必须是黑色。</li>
+                <li>所有叶子(NIL)是黑色。</li>
+            </ul>
+            <ul class="rule-box list-decimal list-inside start-4" start="4">
+                <li class="mt-5"></li>
+                <li class="text-red-600 font-bold">红节点不能连续 (父子不能同为红)。</li>
+                <li class="font-bold">从任一节点到其叶子的所有路径，包含相同数目的黑节点(黑高相同)。</li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col lg:flex-row gap-4 h-[calc(100vh-100px)]">
+        
+        <!-- 左侧控制与解说台 -->
+        <aside class="w-full lg:w-96 flex flex-col gap-4">
+            
+            <!-- 操作面板 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h2 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">🕹️ 树操作</h2>
+                <div class="flex gap-2 mb-4">
+                    <input type="number" id="node-value" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:outline-none" placeholder="输入整数 (如 10)" />
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="handleInsert()" class="bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-medium transition shadow-sm">插入节点</button>
+                    <button onclick="handleDelete()" class="bg-slate-700 hover:bg-slate-800 text-white py-2 rounded-lg font-medium transition shadow-sm">删除节点</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="randomTree()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition">随机建树</button>
+                    <button onclick="resetTree()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition">清空</button>
+                </div>
+            </div>
+
+            <!-- 播放控制台 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h2 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">⏯️ 动画控制</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <button onclick="prevStep()" id="btn-prev" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center">
+                        ▶ 自动播放
+                    </button>
+                    <button onclick="nextStep()" id="btn-next" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                <div class="mb-2 flex justify-between text-xs text-slate-500">
+                    <span>慢速</span><span>速度</span><span>快速</span>
+                </div>
+                <input type="range" id="speed-slider" min="300" max="2500" value="1200" class="w-full" style="direction: rtl;">
+                <div class="text-center text-xs font-bold text-slate-500 mt-2 bg-slate-100 rounded-full py-1" id="step-counter">等待操作...</div>
+            </div>
+
+            <!-- ★ 核心算法解说区 ★ -->
+            <div class="bg-slate-800 rounded-xl shadow-lg border border-slate-700 p-5 flex-1 flex flex-col min-h-[250px]">
+                <h2 class="font-bold text-slate-200 mb-3 border-b border-slate-600 pb-2 flex justify-between">
+                    <span>💡 当前步骤解析</span>
+                    <span class="flex gap-2 text-xs font-normal">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full border border-yellow-400 bg-yellow-400/20"></span>当前</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full border border-blue-400 bg-blue-400/20"></span>辅助</span>
+                    </span>
+                </h2>
+                <div id="explanation-box" class="text-slate-300 text-[15px] leading-relaxed overflow-y-auto no-scrollbar flex-1 space-y-3">
+                    请在上方输入数字并点击“插入节点”，开始观察红黑树的动态调整过程。
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- 右侧画布区 -->
+        <main class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative" id="canvas-container">
+            <!-- 提示角标 -->
+            <div class="absolute top-4 left-4 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm pointer-events-none">
+                支持鼠标拖拽平移视图
+            </div>
+            <!-- SVG画布 -->
+            <svg id="tree-svg" class="w-full h-full cursor-grab active:cursor-grabbing" viewBox="-500 -50 1000 700" preserveAspectRatio="xMidYMin meet">
+                <g id="edges-layer"></g>
+                <g id="nodes-layer"></g>
+            </svg>
+        </main>
+
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心数据结构与红黑树算法 (含步骤录制)
+ * ========================================================================= */
+const RED = 'RED';
+const BLACK = 'BLACK';
+let globalNodeId = 1;
+
+class Node {
+    constructor(val) {
+        this.uid = globalNodeId++; // 唯一渲染ID
+        this.val = val;
+        this.color = RED; // 新节点默认为红色
+        this.left = null;
+        this.right = null;
+        this.parent = null;
+    }
+}
+
+class RedBlackTree {
+    constructor() {
+        // TNULL是哨兵节点，代表NIL叶子，始终为黑色
+        this.TNULL = new Node(null);
+        this.TNULL.color = BLACK;
+        this.root = this.TNULL;
+        this.steps = []; // 动画序列
+    }
+
+    // -- 工具方法：录制快照 --
+    cloneTree(node, parentCopy = null) {
+        if (node === this.TNULL || !node) return null;
+        const copy = { uid: node.uid, val: node.val, color: node.color };
+        copy.left = this.cloneTree(node.left, copy);
+        copy.right = this.cloneTree(node.right, copy);
+        return copy;
+    }
+
+    snapshot(msg, activeUid = null, secondaryUids = []) {
+        this.steps.push({
+            root: this.cloneTree(this.root),
+            msg: msg,
+            active: activeUid,
+            secondary: secondaryUids
+        });
+    }
+
+    // -- 核心算法：左旋 --
+    leftRotate(x) {
+        let y = x.right;
+        this.snapshot(`🔄 <strong>准备左旋：</strong>以节点 <span class="text-white font-bold">${x.val}</span> 为支点进行左旋。<br>节点 <span class="text-white font-bold">${y.val}</span> 将升为父节点，${x.val} 降为左孩子。`, x.uid, [y.uid]);
+        
+        x.right = y.left;
+        if (y.left !== this.TNULL) y.left.parent = x;
+        y.parent = x.parent;
+        
+        if (x.parent === null) this.root = y;
+        else if (x === x.parent.left) x.parent.left = y;
+        else x.parent.right = y;
+        
+        y.left = x;
+        x.parent = y;
+        this.snapshot(`✨ <strong>左旋完成</strong>。结构已更新，继续检查红黑树性质。`, y.uid, [x.uid]);
+    }
+
+    // -- 核心算法：右旋 --
+    rightRotate(x) {
+        let y = x.left;
+        this.snapshot(`🔄 <strong>准备右旋：</strong>以节点 <span class="text-white font-bold">${x.val}</span> 为支点进行右旋。<br>节点 <span class="text-white font-bold">${y.val}</span> 将升为父节点，${x.val} 降为右孩子。`, x.uid, [y.uid]);
+        
+        x.left = y.right;
+        if (y.right !== this.TNULL) y.right.parent = x;
+        y.parent = x.parent;
+        
+        if (x.parent === null) this.root = y;
+        else if (x === x.parent.right) x.parent.right = y;
+        else x.parent.left = y;
+        
+        y.right = x;
+        x.parent = y;
+        this.snapshot(`✨ <strong>右旋完成</strong>。结构已更新，继续检查红黑树性质。`, y.uid, [x.uid]);
+    }
+
+    /* =======================================
+     * 插入操作
+     * ======================================= */
+    insert(val) {
+        this.steps = [];
+        let node = new Node(val);
+        node.left = this.TNULL;
+        node.right = this.TNULL;
+        
+        let y = null;
+        let x = this.root;
+
+        this.snapshot(`🌱 <strong>开始插入：</strong>目标值 <span class="text-white font-bold">${val}</span>。<br>按照二叉搜索树规则向下寻找插入位置。`);
+
+        while (x !== this.TNULL) {
+            y = x;
+            if (node.val < x.val) {
+                x = x.left;
+            } else if (node.val > x.val) {
+                x = x.right;
+            } else {
+                this.snapshot(`❌ 节点 <span class="text-white font-bold">${val}</span> 已存在，红黑树集合不允许重复插入。`, x.uid);
+                return this.steps;
+            }
+        }
+
+        node.parent = y;
+        if (y === null) {
+            this.root = node;
+        } else if (node.val < y.val) {
+            y.left = node;
+        } else {
+            y.right = node;
+        }
+
+        // 核心规则：新插入节点必须是红色
+        if (node.parent === null) {
+            node.color = BLACK;
+            this.snapshot(`✅ <strong>插入根节点：</strong><span class="text-white font-bold">${val}</span> 是第一个节点。<br>根据规则2：<strong>根节点必须是黑色</strong>，直接将其染黑。`, node.uid);
+            return this.steps;
+        }
+
+        this.snapshot(`📌 <strong>节点已就位：</strong><span class="text-white font-bold">${val}</span> 插入成功。<br>新插入的节点<strong>默认染为红色</strong>（为了不破坏黑高相同的规则）。<br>接下来开始检查是否违反“不能有连续红节点”的规则。`, node.uid);
+
+        if (node.parent.parent === null) {
+            this.snapshot(`✅ <strong>无需调整：</strong>父节点是根节点(黑色)，新红节点不会造成连续红色，插入完成。`, node.uid);
+            return this.steps;
+        }
+
+        // 启动插入修正
+        this.insertFixup(node);
+        return this.steps;
+    }
+
+    insertFixup(k) {
+        let u; // 叔叔节点
+        while (k.parent.color === RED) {
+            // 父节点在祖父节点的左侧
+            if (k.parent === k.parent.parent.left) {
+                u = k.parent.parent.right; // 叔叔是右孩子
+
+                if (u.color === RED) {
+                    /* --- Case 1: 叔叔是红色 --- */
+                    this.snapshot(`⚠️ <strong>发现冲突 (红-红连续)：</strong>当前节点 <span class="text-white">${k.val}</span> 和父节点 <span class="text-white">${k.parent.val}</span> 同为红色。<br>
+                        🔍 <strong>【情况 1：叔叔为红】</strong>：叔叔节点 <span class="text-white">${u.val}</span> 也是红色。<br>
+                        🛠️ <strong>解法：</strong>将【父节点】和【叔叔节点】染黑，【祖父节点】染红。然后把指针移到祖父节点继续检查向上是否冲突。`, 
+                        k.uid, [k.parent.uid, u.uid, k.parent.parent.uid]);
+                    
+                    u.color = BLACK;
+                    k.parent.color = BLACK;
+                    k.parent.parent.color = RED;
+                    k = k.parent.parent;
+                    
+                    this.snapshot(`🎨 <strong>变色完成：</strong>父辈已变黑，祖父 <span class="text-white">${k.val}</span> 变红。当前焦点转移到祖父节点。`, k.uid);
+                    
+                } else {
+                    /* --- Case 2 & 3: 叔叔是黑色 --- */
+                    if (k === k.parent.right) {
+                        // Case 2: 当前是右孩子，父是左孩子 (LR形状) -> 先左旋转化为LL形状
+                        this.snapshot(`⚠️ <strong>发现冲突 (红-红连续)：</strong><br>
+                            🔍 <strong>【情况 2：叔叔为黑，且当前节点是右孩子 (LR型)】</strong>。<br>
+                            🛠️ <strong>解法：</strong>以父节点 <span class="text-white">${k.parent.val}</span> 为支点进行 <strong>左旋</strong>，将其转化为一条直线(LL型)。`, 
+                            k.uid, [k.parent.uid]);
+                        k = k.parent;
+                        this.leftRotate(k);
+                    }
+                    
+                    // Case 3: 当前是左孩子，父是左孩子 (LL形状) -> 变色+右旋
+                    this.snapshot(`⚠️ <strong>处理直线型冲突：</strong><br>
+                        🔍 <strong>【情况 3：叔叔为黑，且当前节点是左孩子 (LL型)】</strong>。<br>
+                        🛠️ <strong>解法：</strong>将【父节点】染黑，【祖父节点】染红，然后以祖父节点为支点进行 <strong>右旋</strong>。`, 
+                        k.uid, [k.parent.uid, k.parent.parent.uid]);
+                    
+                    k.parent.color = BLACK;
+                    k.parent.parent.color = RED;
+                    this.rightRotate(k.parent.parent);
+                }
+            } 
+            // 父节点在祖父节点的右侧 (对称操作)
+            else {
+                u = k.parent.parent.left;
+
+                if (u.color === RED) {
+                    /* --- Case 1 对称 --- */
+                    this.snapshot(`⚠️ <strong>发现冲突 (红-红连续)：</strong><br>
+                        🔍 <strong>【情况 1：叔叔为红】</strong>：叔叔节点 <span class="text-white">${u.val}</span> 也是红色。<br>
+                        🛠️ <strong>解法：</strong>【父】和【叔】染黑，【祖父】染红。焦点上移至祖父。`, 
+                        k.uid, [k.parent.uid, u.uid, k.parent.parent.uid]);
+                        
+                    u.color = BLACK;
+                    k.parent.color = BLACK;
+                    k.parent.parent.color = RED;
+                    k = k.parent.parent;
+                    
+                    this.snapshot(`🎨 <strong>变色完成：</strong>焦点转移到 <span class="text-white">${k.val}</span>。`, k.uid);
+                } else {
+                    if (k === k.parent.left) {
+                        /* --- Case 2 对称: RL形状 --- */
+                        this.snapshot(`⚠️ <strong>发现冲突 (红-红连续)：</strong><br>
+                            🔍 <strong>【情况 2：叔叔为黑，且当前节点是左孩子 (RL型)】</strong>。<br>
+                            🛠️ <strong>解法：</strong>以父节点 <span class="text-white">${k.parent.val}</span> 为支点 <strong>右旋</strong>，转化为RR直线型。`, 
+                            k.uid, [k.parent.uid]);
+                        k = k.parent;
+                        this.rightRotate(k);
+                    }
+                    /* --- Case 3 对称: RR形状 --- */
+                    this.snapshot(`⚠️ <strong>处理直线型冲突：</strong><br>
+                        🔍 <strong>【情况 3：叔叔为黑，且当前节点是右孩子 (RR型)】</strong>。<br>
+                        🛠️ <strong>解法：</strong>【父】染黑，【祖父】染红，然后以祖父节点为支点进行 <strong>左旋</strong>。`, 
+                        k.uid, [k.parent.uid, k.parent.parent.uid]);
+                        
+                    k.parent.color = BLACK;
+                    k.parent.parent.color = RED;
+                    this.leftRotate(k.parent.parent);
+                }
+            }
+            if (k === this.root) break;
+        }
+        
+        // 规则2防御性强制修复
+        if(this.root.color === RED) {
+            this.root.color = BLACK;
+            this.snapshot(`🏁 <strong>最终检查：</strong>根节点被染成了红色。<br>根据规则：<strong>根节点必须是黑色</strong>，强制将其染黑。插入调整彻底完成！`, this.root.uid);
+        } else {
+            this.snapshot(`🏁 <strong>调整完成：</strong>没有任何红红连续，且黑高平衡，红黑树性质完美保持！`);
+        }
+    }
+
+    /* =======================================
+     * 删除操作
+     * ======================================= */
+    transplant(u, v) {
+        if (u.parent === null) {
+            this.root = v;
+        } else if (u === u.parent.left) {
+            u.parent.left = v;
+        } else {
+            u.parent.right = v;
+        }
+        v.parent = u.parent;
+    }
+
+    minimum(node) {
+        while (node.left !== this.TNULL) {
+            node = node.left;
+        }
+        return node;
+    }
+
+    delete(val) {
+        this.steps = [];
+        let z = this.root;
+        while (z !== this.TNULL) {
+            if (val === z.val) break;
+            if (val < z.val) z = z.left;
+            else z = z.right;
+        }
+
+        if (z === this.TNULL) {
+            this.snapshot(`❌ <strong>未找到节点</strong> <span class="text-white">${val}</span>，无法删除。`);
+            return this.steps;
+        }
+
+        this.snapshot(`🎯 <strong>找到目标节点：</strong>准备删除 <span class="text-white font-bold">${val}</span>。`, z.uid);
+
+        let y = z;
+        let yOriginalColor = y.color;
+        let x;
+
+        // 标准 BST 删除
+        if (z.left === this.TNULL) {
+            x = z.right;
+            this.snapshot(`✂️ <strong>执行切除：</strong>节点 ${val} 只有右孩子（或无孩子）。<br>直接用右孩子替代它的位置。`, z.uid, [x.uid]);
+            this.transplant(z, z.right);
+        } else if (z.right === this.TNULL) {
+            x = z.left;
+            this.snapshot(`✂️ <strong>执行切除：</strong>节点 ${val} 只有左孩子。<br>直接用左孩子替代它的位置。`, z.uid, [x.uid]);
+            this.transplant(z, z.left);
+        } else {
+            // 找后继节点
+            y = this.minimum(z.right);
+            yOriginalColor = y.color;
+            x = y.right;
+            
+            this.snapshot(`🔍 <strong>寻找后继：</strong>节点 ${val} 有两个孩子。<br>找到右子树中最小的节点 <span class="text-white font-bold">${y.val}</span> 作为后继节点进行替换。`, z.uid, [y.uid]);
+            
+            if (y.parent === z) {
+                x.parent = y;
+            } else {
+                this.transplant(y, y.right);
+                y.right = z.right;
+                y.right.parent = y;
+            }
+
+            this.transplant(z, y);
+            y.left = z.left;
+            y.left.parent = y;
+            y.color = z.color; // 顶替者继承原节点的颜色，所以原位置不破坏红黑性质
+
+            this.snapshot(`🔄 <strong>替换完成：</strong>用后继节点 <span class="text-white">${y.val}</span> 替换了待删除节点。<br>⚠️ 注意：真正从树结构中消失的物理节点是原后继节点(之前在底部的那个)，它的原始颜色是 <span class="text-${yOriginalColor === RED ? 'red' : 'slate'}-400 font-bold">${yOriginalColor === RED ? '红色' : '黑色'}</span>。`, y.uid);
+        }
+
+        // 如果真正删掉的那个位置的节点是黑色，说明少了一个黑色，会破坏黑高相同规则，需要 Fixup
+        if (yOriginalColor === BLACK) {
+            this.snapshot(`🚨 <strong>黑高破坏报警！</strong><br>由于实际删减掉的节点是<strong>黑色</strong>的，导致经过该路径的黑高减少了 1。<br>此时产生了一个“双黑节点”(当前节点 <span class="text-white">${x.val !== null ? x.val : 'NIL'}</span>)，需要进行删除修正操作！`, x.uid);
+            this.deleteFixup(x);
+        } else {
+            this.snapshot(`✅ <strong>删除安全：</strong>被实际剪除的节点是红色的，不会改变任何路径的黑高数量，树依然保持平衡，删除完成！`);
+        }
+        
+        return this.steps;
+    }
+
+    deleteFixup(x) {
+        let s; // 兄弟节点
+        while (x !== this.root && x.color === BLACK) {
+            if (x === x.parent.left) {
+                s = x.parent.right;
+
+                /* --- Case 1: 兄弟是红色 --- */
+                if (s.color === RED) {
+                    this.snapshot(`🛠️ <strong>【删除修正-情况1】：</strong>兄弟节点 <span class="text-white">${s.val}</span> 是红色。<br>
+                        <strong>解法：</strong>将兄弟染黑，父节点染红，然后对父节点 <strong>左旋</strong>。<br>目的是将一个黑色节点借到这边来，转化为情况2,3或4。`, 
+                        x.uid, [s.uid, x.parent.uid]);
+                    s.color = BLACK;
+                    x.parent.color = RED;
+                    this.leftRotate(x.parent);
+                    s = x.parent.right; // 更新兄弟
+                }
+
+                /* --- Case 2: 兄弟是黑色，且兄弟的两个孩子都是黑色 --- */
+                if (s.left.color === BLACK && s.right.color === BLACK) {
+                    this.snapshot(`🛠️ <strong>【删除修正-情况2】：</strong>兄弟是黑色，且兄弟的两个侄子全黑。<br>
+                        <strong>解法：</strong>我们将兄弟节点染红（把少一个黑色的责任上推给父节点）。指针指向父节点继续向上检查。`, 
+                        x.uid, [s.uid]);
+                    s.color = RED;
+                    x = x.parent;
+                    this.snapshot(`⏫ <strong>焦点上移：</strong>现在把 <span class="text-white">${x.val || 'NIL'}</span> 当作带有额外一层黑色的节点继续考察。`, x.uid);
+                } else {
+                    /* --- Case 3: 兄弟是黑色，近侄子红，远侄子黑 --- */
+                    if (s.right.color === BLACK) {
+                        this.snapshot(`🛠️ <strong>【删除修正-情况3】：</strong>兄弟黑，近处侄子(<span class="text-white">${s.left.val}</span>)是红，远处侄子黑。<br>
+                            <strong>解法：</strong>近侄子染黑，兄弟染红，对兄弟进行 <strong>右旋</strong>。目的是把它转化为最容易解决的情况4。`, 
+                            x.uid, [s.uid, s.left.uid]);
+                        s.left.color = BLACK;
+                        s.color = RED;
+                        this.rightRotate(s);
+                        s = x.parent.right;
+                    }
+
+                    /* --- Case 4: 兄弟是黑色，远侄子红 --- */
+                    this.snapshot(`🛠️ <strong>【删除修正-情况4】：</strong>兄弟黑，远处侄子(<span class="text-white">${s.right.val}</span>)是红色 (最强力的大招)。<br>
+                        <strong>解法：</strong>兄弟继承父节点的颜色，父节点染黑，远侄子染黑。对父节点进行 <strong>左旋</strong>！<br>
+                        这一套操作直接补齐了这边的黑高，并将另一边多出来的红色变成了黑色，完美解决！`, 
+                        x.uid, [s.uid, s.right.uid, x.parent.uid]);
+                    
+                    s.color = x.parent.color;
+                    x.parent.color = BLACK;
+                    s.right.color = BLACK;
+                    this.leftRotate(x.parent);
+                    x = this.root; // 直接完成，退出循环
+                }
+            } else {
+                // --- 对称情况 ---
+                s = x.parent.left;
+
+                if (s.color === RED) {
+                    this.snapshot(`🛠️ <strong>【删除修正-情况1(对称)】：</strong>兄弟 <span class="text-white">${s.val}</span> 红。<br>
+                        <strong>解法：</strong>兄弟染黑，父染红，对父 <strong>右旋</strong>。`, x.uid, [s.uid, x.parent.uid]);
+                    s.color = BLACK;
+                    x.parent.color = RED;
+                    this.rightRotate(x.parent);
+                    s = x.parent.left;
+                }
+
+                if (s.right.color === BLACK && s.left.color === BLACK) {
+                    this.snapshot(`🛠️ <strong>【删除修正-情况2(对称)】：</strong>兄弟黑，两个侄子全黑。<br>
+                        <strong>解法：</strong>兄弟染红，责任上推给父节点。`, x.uid, [s.uid]);
+                    s.color = RED;
+                    x = x.parent;
+                } else {
+                    if (s.left.color === BLACK) {
+                        this.snapshot(`🛠️ <strong>【删除修正-情况3(对称)】：</strong>兄弟黑，近处侄子红。<br>
+                            <strong>解法：</strong>近侄子染黑，兄弟染红，对兄弟 <strong>左旋</strong>，转为情况4。`, x.uid, [s.uid, s.right.uid]);
+                        s.right.color = BLACK;
+                        s.color = RED;
+                        this.leftRotate(s);
+                        s = x.parent.left;
+                    }
+
+                    this.snapshot(`🛠️ <strong>【删除修正-情况4(对称)】：</strong>兄弟黑，远处侄子红。<br>
+                        <strong>解法：</strong>兄弟继承父色，父染黑，远侄染黑。对父 <strong>右旋</strong>，彻底解决平衡问题！`, x.uid, [s.uid, s.left.uid, x.parent.uid]);
+                    s.color = x.parent.color;
+                    x.parent.color = BLACK;
+                    s.left.color = BLACK;
+                    this.rightRotate(x.parent);
+                    x = this.root;
+                }
+            }
+        }
+        
+        if (x.color !== BLACK) {
+            x.color = BLACK;
+            this.snapshot(`🏁 <strong>最终收尾：</strong>将补偿上推到的红节点染成黑色，填补缺少的黑高。删除修正彻底完成！`, x.uid);
+        } else {
+            this.snapshot(`🏁 <strong>删除修正完成！</strong> 树重新达到了完美平衡。`);
+        }
+    }
+}
+
+/* =========================================================================
+ * 2. 视图渲染引擎
+ * ========================================================================= */
+const rbt = new RedBlackTree();
+let activeSteps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+const nodesLayer = document.getElementById('nodes-layer');
+const edgesLayer = document.getElementById('edges-layer');
+const explanationBox = document.getElementById('explanation-box');
+
+// 递归计算坐标
+function calcLayout(node, x, y, level, layoutNodes, layoutEdges) {
+    if (!node) return;
+    
+    // 动态间距，越深层越紧密
+    const dx = Math.max(50, 300 / Math.pow(1.6, level)); 
+    const dy = 80;
+
+    layoutNodes.push({ uid: node.uid, val: node.val, color: node.color, x: x, y: y });
+
+    if (node.left) {
+        layoutEdges.push({ id: `e-${node.uid}-${node.left.uid}`, fromX: x, fromY: y, toX: x - dx, toY: y + dy, parentUid: node.uid, childUid: node.left.uid });
+        calcLayout(node.left, x - dx, y + dy, level + 1, layoutNodes, layoutEdges);
+    }
+    if (node.right) {
+        layoutEdges.push({ id: `e-${node.uid}-${node.right.uid}`, fromX: x, fromY: y, toX: x + dx, toY: y + dy, parentUid: node.uid, childUid: node.right.uid });
+        calcLayout(node.right, x + dx, y + dy, level + 1, layoutNodes, layoutEdges);
+    }
+}
+
+function renderSnapshot(step) {
+    if (!step) return;
+
+    // 1. 生成排版数据
+    const layoutNodes = [];
+    const layoutEdges = [];
+    calcLayout(step.root, 0, 50, 1, layoutNodes, layoutEdges);
+
+    // 2. 更新解说
+    explanationBox.innerHTML = step.msg;
+
+    // 3. 渲染连线 (Edges 先渲染，放在底层)
+    const currentEdgeIds = new Set();
+    layoutEdges.forEach(e => {
+        currentEdgeIds.add(e.id);
+        let line = document.getElementById(e.id);
+        if (!line) {
+            line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("id", e.id);
+            line.setAttribute("class", "edge-line");
+            line.setAttribute("x1", e.fromX); line.setAttribute("y1", e.fromY);
+            line.setAttribute("x2", e.fromX); line.setAttribute("y2", e.fromY); // 初始从父节点发出
+            edgesLayer.appendChild(line);
+        }
+
+        // 动画移位
+        setTimeout(() => {
+            line.setAttribute("x1", e.fromX); line.setAttribute("y1", e.fromY);
+            line.setAttribute("x2", e.toX); line.setAttribute("y2", e.toY);
+        }, 20);
+
+        // 旋转路径高亮逻辑
+        let isHighlight = false;
+        if(step.active && step.secondary && step.secondary.length > 0) {
+            if((step.active === e.parentUid && step.secondary.includes(e.childUid)) || 
+               (step.active === e.childUid && step.secondary.includes(e.parentUid))) {
+                isHighlight = true;
+            }
+        }
+        line.setAttribute("class", isHighlight ? "edge-line highlight" : "edge-line");
+    });
+
+    Array.from(edgesLayer.children).forEach(line => {
+        if (!currentEdgeIds.has(line.id)) {
+            line.style.opacity = "0";
+            setTimeout(() => line.remove(), 500);
+        }
+    });
+
+    // 4. 渲染节点
+    const currentNodeIds = new Set();
+    layoutNodes.forEach(n => {
+        currentNodeIds.add(`n-${n.uid}`);
+        let g = document.getElementById(`n-${n.uid}`);
+        
+        if (!g) {
+            g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("id", `n-${n.uid}`);
+            g.setAttribute("transform", `translate(${n.x}, ${n.y - 30})`);
+            g.style.opacity = "0";
+            g.style.transition = "opacity 0.4s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)";
+            
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("r", "24");
+            
+            const textVal = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textVal.setAttribute("class", "val");
+            
+            g.appendChild(circle);
+            g.appendChild(textVal);
+            nodesLayer.appendChild(g);
+        }
+
+        // 设置文本
+        g.querySelector('.val').textContent = n.val;
+        
+        // 设置状态类名
+        let classList = `node ${n.color}`;
+        if (step.active === n.uid) classList += ' active';
+        else if (step.secondary && step.secondary.includes(n.uid)) classList += ' secondary';
+        g.setAttribute("class", classList);
+
+        // 坐标平移
+        setTimeout(() => {
+            g.setAttribute("transform", `translate(${n.x}, ${n.y})`);
+            g.style.opacity = "1";
+        }, 20);
+    });
+
+    // 清除废弃节点
+    Array.from(nodesLayer.children).forEach(g => {
+        if (!currentNodeIds.has(g.id)) {
+            g.style.opacity = "0";
+            const trans = g.getAttribute("transform");
+            if(trans) {
+                // 向下掉落消失
+                const match = trans.match(/translate\(([^,]+),\s*([^)]+)\)/);
+                if(match) g.setAttribute("transform", `translate(${match[1]}, ${parseFloat(match[2]) + 40})`);
+            }
+            setTimeout(() => g.remove(), 500);
+        }
+    });
+}
+
+/* =========================================================================
+ * 3. 播放与交互控制
+ * ========================================================================= */
+function updateUI() {
+    const total = activeSteps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '等待操作...' : `动画进度: ${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停';
+        playBtn.className = 'px-6 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition shadow-sm w-32 flex justify-center';
+    } else {
+        playBtn.innerText = '▶ 自动播放';
+        playBtn.className = 'px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center';
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < activeSteps.length) {
+        currentStepIdx = idx;
+        renderSnapshot(activeSteps[currentStepIdx]);
+        updateUI();
+    }
+}
+
+function nextStep() {
+    if (currentStepIdx < activeSteps.length - 1) showStep(currentStepIdx + 1);
+    else stopPlay();
+}
+
+function prevStep() {
+    if (currentStepIdx > 0) showStep(currentStepIdx - 1);
+}
+
+function togglePlay() {
+    if(activeSteps.length === 0) return;
+    if (playInterval) {
+        stopPlay();
+    } else {
+        if (currentStepIdx >= activeSteps.length - 1) currentStepIdx = 0; // 重播
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value); // 计算延迟
+        playInterval = setInterval(nextStep, speed);
+        updateUI();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        updateUI();
+    }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } // 改变速度时重启定时器
+});
+
+// 操作触发器
+function executeOp(opFunc) {
+    stopPlay();
+    const newSteps = opFunc();
+    if (newSteps && newSteps.length > 0) {
+        activeSteps = newSteps;
+        currentStepIdx = 0;
+        showStep(0);
+        togglePlay(); // 操作后自动播放
+    } else {
+        document.getElementById('node-value').value = '';
+    }
+}
+
+function handleInsert() {
+    const input = document.getElementById('node-value');
+    const val = parseInt(input.value);
+    if (!isNaN(val)) {
+        executeOp(() => rbt.insert(val));
+        input.value = '';
+    }
+}
+
+function handleDelete() {
+    const input = document.getElementById('node-value');
+    const val = parseInt(input.value);
+    if (!isNaN(val)) {
+        executeOp(() => rbt.delete(val));
+        input.value = '';
+    }
+}
+
+function resetTree() {
+    stopPlay();
+    rbt.root = rbt.TNULL;
+    globalNodeId = 1;
+    activeSteps = [{ root: null, msg: "🌳 <strong>红黑树已清空。</strong><br>请在左侧输入数值并点击插入，开始构建您的红黑树。", active: null, secondary: [] }];
+    currentStepIdx = 0;
+    showStep(0);
+}
+
+// 快速构建随机树（跳过冗长动画，只展示最终状态）
+function randomTree() {
+    resetTree();
+    const count = 9;
+    let vals = new Set();
+    while(vals.size < count) vals.add(Math.floor(Math.random() * 100) + 1);
+    
+    let lastSteps = [];
+    vals.forEach(v => {
+        lastSteps = rbt.insert(v); // 只保留最后一次插入的动画序列
+    });
+    
+    activeSteps = lastSteps;
+    currentStepIdx = activeSteps.length - 1; // 直接跳到最后一步
+    showStep(currentStepIdx);
+    explanationBox.innerHTML = `✅ <strong>已快速生成包含 ${count} 个节点的随机红黑树。</strong><br>你可以继续手动插入或删除节点来观察动态调整过程。`;
+}
+
+// 支持画布鼠标拖拽 (平移)
+const svg = document.getElementById('tree-svg');
+let isDragging = false, startX, startY, viewBox;
+
+svg.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+    svg.style.cursor = 'grabbing';
+});
+window.addEventListener('mouseup', () => { isDragging = false; svg.style.cursor = 'grab'; });
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = (startX - e.clientX) * 1.5; // 平移倍率
+    const dy = (startY - e.clientY) * 1.5;
+    svg.setAttribute('viewBox', `${viewBox[0] + dx} ${viewBox[1] + dy} ${viewBox[2]} ${viewBox[3]}`);
+});
+
+// 绑定回车键快速插入
+document.getElementById('node-value').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') handleInsert();
+});
+
+// 页面加载完毕初始化
+window.onload = () => {
+    resetTree();
+};
+</script>
+</body>
+</html>

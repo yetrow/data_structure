@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMP算法 - Next数组原理解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .code-line { transition: background-color 0.3s; padding: 2px 8px; border-radius: 4px; display: block; }
+        .active-line { background-color: rgba(234, 179, 8, 0.4); border-left: 4px solid #eab308; }
+        .cell-transition { transition: all 0.3s ease; }
+        .pointer-jump { animation: bounce 0.5s ease; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        /* 隐藏滚动条但保留滚动功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+
+<div class="max-w-6xl mx-auto p-6">
+    <!-- 标题区 -->
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🚀 KMP 算法：一步步看懂 next 数组</h1>
+        <p class="text-gray-600">输入模式串，通过可视化演示，深入理解 i、j 指针的移动和 next 数组的计算过程。</p>
+    </header>
+
+    <!-- 控制面板区 -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">模式串 T：</label>
+            <input type="text" id="pattern-input" value="ababaa" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                   placeholder="输入模式串，例如 ababaa">
+        </div>
+        <button id="btn-generate" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+            初始化/重置
+        </button>
+        <div class="h-8 border-l border-gray-300 mx-2 hidden sm:block"></div>
+        <button id="btn-prev" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50">
+            &larr; 上一步
+        </button>
+        <button id="btn-next" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium disabled:opacity-50">
+            下一步 &rarr;
+        </button>
+        <button id="btn-play" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition font-medium">
+            ▶ 自动播放
+        </button>
+        <span class="text-sm text-gray-500 ml-auto" id="step-counter">进度: 0 / 0</span>
+    </div>
+
+    <!-- 核心展示区 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- 左侧：可视化与解说 -->
+        <div class="space-y-6">
+            <!-- 讲解气泡 -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-r-lg shadow-sm min-h-[100px] flex items-center">
+                <p id="explanation-text" class="text-lg text-blue-900">
+                    点击“初始化/重置”开始演示。
+                </p>
+            </div>
+
+            <!-- 数组可视化区域 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">内存状态视图</h3>
+                <!-- Grid 容器 -->
+                <div id="grid-container" class="flex flex-row overflow-x-auto no-scrollbar gap-2 pb-6 pt-2 px-2 items-center">
+                    <!-- 动态生成的方块将插入这里 -->
+                </div>
+            </div>
+
+            <!-- 原理科普卡片 -->
+            <div class="bg-gray-800 text-gray-300 p-5 rounded-xl text-sm leading-relaxed">
+                <h4 class="text-white font-bold mb-2">💡 为什么是 j = next[j]？</h4>
+                <p>当匹配失败时（<code class="text-yellow-400">T[i] != T[j]</code>），我们不需要把 <code>i</code> 退回起点。因为此时前 <code>j-1</code> 个字符已经匹配成功了。<br><br>
+                <code>next[j]</code> 保存的正是这前 <code>j-1</code> 个字符构成的子串中，<strong>最长相等前后缀的长度</strong>。让 <code>j</code> 退回到 <code>next[j]</code>，相当于直接对齐了已知的相同前后缀，极大地提升了效率！</p>
+            </div>
+        </div>
+
+        <!-- 右侧：代码高亮 -->
+        <div class="bg-[#1e1e1e] rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div class="bg-[#2d2d2d] px-4 py-2 flex items-center space-x-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                <span class="text-xs text-gray-400 ml-2 font-mono">kmp.c</span>
+            </div>
+            <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto m-0"><code id="code-container">
+<span id="line-1" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">get_next</span>(SString T, <span class="text-pink-400">int</span> next[]) {</span>
+<span id="line-2" class="code-line">    <span class="text-pink-400">int</span> i = <span class="text-orange-400">1</span>, j = <span class="text-orange-400">0</span>;</span>
+<span id="line-3" class="code-line">    next[<span class="text-orange-400">1</span>] = <span class="text-orange-400">0</span>;</span>
+<span id="line-4" class="code-line">    <span class="text-pink-400">while</span> (i < T.length) {</span>
+<span id="line-5" class="code-line">        <span class="text-pink-400">if</span> (j == <span class="text-orange-400">0</span> || T.ch[i] == T.ch[j]) {</span>
+<span id="line-6" class="code-line">            ++i; ++j;</span>
+<span id="line-7" class="code-line">            next[i] = j;</span>
+<span id="line-8" class="code-line">        } <span class="text-pink-400">else</span> {</span>
+<span id="line-9" class="code-line">            j = next[j];  <span class="text-gray-500">// 回退到更短的公共前后缀</span></span>
+<span id="line-10" class="code-line">        }</span>
+<span id="line-11" class="code-line">    }</span>
+<span id="line-12" class="code-line">}</span>
+            </code></pre>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 状态管理
+    let steps = [];
+    let currentStepIndex = 0;
+    let autoPlayInterval = null;
+    let patternLength = 0;
+
+    // 获取 DOM 元素
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const btnPlay = document.getElementById('btn-play');
+    const patternInput = document.getElementById('pattern-input');
+    const gridContainer = document.getElementById('grid-container');
+    const explanationText = document.getElementById('explanation-text');
+    const stepCounter = document.getElementById('step-counter');
+
+    // 核心逻辑：模拟 get_next 算法并记录所有状态步骤
+    function generateSteps(tStr) {
+        steps = [];
+        patternLength = tStr.length;
+        // 使用 1-based index，前面补个空格方便对应算法
+        let T = " " + tStr; 
+        let next = new Array(patternLength + 1).fill('');
+        
+        let i = 1, j = 0;
+        next[1] = 0;
+
+        steps.push({
+            i: i, j: j, next: [...next], line: 3,
+            msg: `<strong>初始化：</strong> 指针 <span class="text-red-500 font-bold">i = 1</span>，指针 <span class="text-blue-500 font-bold">j = 0</span>。<br>根据定义，第一个字符的 next 值为 0，即 <code class="bg-blue-100 px-1 rounded">next[1] = 0</code>。`
+        });
+
+        while (i < patternLength) {
+            steps.push({
+                i: i, j: j, next: [...next], line: 4,
+                msg: `<strong>循环条件：</strong> <code class="bg-blue-100 px-1 rounded">i (${i}) < T.length (${patternLength})</code> 成立，继续计算。`
+            });
+
+            let conditionStr = j === 0 ? `j == 0 成立` : `T[${i}]('${T[i]}') ${T[i] === T[j] ? '==' : '!='} T[${j}]('${T[j]}')`;
+            steps.push({
+                i: i, j: j, next: [...next], line: 5,
+                msg: `<strong>判断分支：</strong> 检查条件 <code class="bg-blue-100 px-1 rounded">j == 0 || T[i] == T[j]</code><br>当前：${conditionStr}。`
+            });
+
+            if (j === 0 || T[i] === T[j]) {
+                let old_i = i, old_j = j;
+                ++i;
+                ++j;
+                next[i] = j;
+                steps.push({
+                    i: i, j: j, next: [...next], line: 7,
+                    msg: `<strong>条件满足：</strong> ${old_j === 0 ? '因为 j=0' : '因为字符匹配成功'}！<br>指针 i 和 j 同时前进一步 (<span class="text-red-500 font-bold">i=${i}</span>, <span class="text-blue-500 font-bold">j=${j}</span>)，并记录 <code class="bg-green-100 text-green-800 px-1 rounded">next[${i}] = ${j}</code>。`
+                });
+            } else {
+                let old_j = j;
+                j = next[j];
+                steps.push({
+                    i: i, j: j, next: [...next], line: 9,
+                    msg: `<strong>字符不匹配：</strong> T[${i}]('${T[i]}') 和 T[${old_j}]('${T[old_j]}') 不一样！<br>主串指针 i 不动，模式串指针 j 回退到 <code class="bg-blue-100 px-1 rounded">next[${old_j}]</code>，即 <span class="text-blue-500 font-bold">j 变为 ${j}</span>。`
+                });
+            }
+        }
+        
+        steps.push({
+            i: i, j: j, next: [...next], line: 12,
+            msg: `<strong>计算完成：</strong> <code class="bg-blue-100 px-1 rounded">i (${i}) &gt;= T.length (${patternLength})</code>，循环结束。<br>整个 next 数组计算完毕！`
+        });
+    }
+
+    // 渲染 UI
+    function renderStep(index) {
+        if (index < 0 || index >= steps.length) return;
+        
+        const state = steps[index];
+        const tStr = patternInput.value;
+        const T = " " + tStr;
+
+        // 1. 渲染代码高亮
+        document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active-line'));
+        const activeLineEl = document.getElementById(`line-${state.line}`);
+        if(activeLineEl) activeLineEl.classList.add('active-line');
+
+        // 2. 更新解说
+        explanationText.innerHTML = state.msg;
+        stepCounter.innerText = `进度: ${index + 1} / ${steps.length}`;
+
+        // 3. 渲染数组 Grid
+        gridContainer.innerHTML = '';
+        
+        // 生成列 (从 0 到 length)
+        for (let col = 0; col <= patternLength; col++) {
+            const isJ = state.j === col;
+            const isI = state.i === col;
+            const char = col === 0 ? '∅' : T[col];
+            let nextVal = state.next[col];
+            if (nextVal === '' || nextVal === undefined) nextVal = '&nbsp;';
+            if (col === 0) nextVal = '-'; // 0号位无next
+
+            // 构造格子 HTML
+            const cellHtml = `
+                <div class="flex flex-col items-center min-w-[3.5rem] cell-transition">
+                    <!-- j 指针区域 -->
+                    <div class="h-8 flex items-end justify-center pb-1">
+                        ${isJ ? '<span class="text-blue-500 font-bold pointer-jump flex flex-col items-center text-xs"><span>j</span>↓</span>' : ''}
+                    </div>
+                    
+                    <!-- 核心数据块 -->
+                    <div class="border-2 ${isI ? 'border-red-400 shadow-md transform scale-105' : isJ ? 'border-blue-300' : 'border-gray-200'} rounded-lg overflow-hidden bg-white w-full">
+                        <div class="bg-gray-100 text-[10px] text-gray-500 text-center py-0.5 border-b">
+                            idx:${col}
+                        </div>
+                        <div class="text-xl font-bold text-center py-2 border-b ${col===0 ? 'text-gray-300' : 'text-gray-800'}">
+                            ${char}
+                        </div>
+                        <div class="text-lg font-mono text-center py-1 bg-green-50 text-green-700 h-[36px] flex items-center justify-center">
+                            ${nextVal}
+                        </div>
+                    </div>
+                    
+                    <!-- i 指针区域 -->
+                    <div class="h-8 flex items-start justify-center pt-1">
+                        ${isI ? '<span class="text-red-500 font-bold pointer-jump flex flex-col items-center text-xs">↑<span>i</span></span>' : ''}
+                    </div>
+                </div>
+            `;
+            gridContainer.insertAdjacentHTML('beforeend', cellHtml);
+        }
+
+        // 按钮状态管理
+        btnPrev.disabled = index === 0;
+        btnNext.disabled = index === steps.length - 1;
+    }
+
+    // 控制函数
+    function init() {
+        const val = patternInput.value.trim();
+        if (!val) {
+            alert("请输入模式串！");
+            return;
+        }
+        stopPlay();
+        generateSteps(val);
+        currentStepIndex = 0;
+        renderStep(currentStepIndex);
+    }
+
+    function goNext() {
+        if (currentStepIndex < steps.length - 1) {
+            currentStepIndex++;
+            renderStep(currentStepIndex);
+        } else {
+            stopPlay();
+        }
+    }
+
+    function goPrev() {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            renderStep(currentStepIndex);
+        }
+    }
+
+    function togglePlay() {
+        if (autoPlayInterval) {
+            stopPlay();
+        } else {
+            if (currentStepIndex === steps.length - 1) {
+                currentStepIndex = 0; // 如果到底了，重头播
+            }
+            btnPlay.innerHTML = "⏸ 暂停播放";
+            btnPlay.classList.replace('bg-green-100', 'bg-yellow-100');
+            btnPlay.classList.replace('text-green-700', 'text-yellow-700');
+            goNext();
+            autoPlayInterval = setInterval(goNext, 1200); // 每1.2秒走一步
+        }
+    }
+
+    function stopPlay() {
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+            btnPlay.innerHTML = "▶ 自动播放";
+            btnPlay.classList.replace('bg-yellow-100', 'bg-green-100');
+            btnPlay.classList.replace('text-yellow-700', 'text-green-700');
+        }
+    }
+
+    // 事件绑定
+    btnGenerate.addEventListener('click', init);
+    btnNext.addEventListener('click', () => { stopPlay(); goNext(); });
+    btnPrev.addEventListener('click', () => { stopPlay(); goPrev(); });
+    btnPlay.addEventListener('click', togglePlay);
+    
+    // 支持按回车重新初始化
+    patternInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            init();
+        }
+    });
+
+    // 页面加载完毕后自动初始化
+    window.onload = init;
+
+</script>
+</body>
+</html>

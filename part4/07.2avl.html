@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AVL平衡二叉树原理解析 (408考研标准)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* SVG 动画过渡样式 */
+        .node { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .edge { transition: all 0.6s ease-in-out; }
+        
+        /* 节点基础样式 */
+        .node circle {
+            fill: #ffffff;
+            stroke: #3b82f6; /* 默认蓝色 */
+            stroke-width: 3px;
+            transition: all 0.3s ease;
+        }
+        .node text.val { fill: #1e293b; font-weight: bold; font-size: 16px; text-anchor: middle; dominant-baseline: central; }
+        .node text.bf { fill: #64748b; font-size: 12px; font-weight: bold; text-anchor: middle; }
+        
+        /* 节点高亮状态 (对应408考点) */
+        .node.active circle { fill: #fef08a; stroke: #eab308; } /* 遍历查找中 */
+        .node.insert circle { fill: #dcfce7; stroke: #22c55e; } /* 新插入 */
+        .node.delete circle { fill: #fee2e2; stroke: #ef4444; } /* 待删除 */
+        .node.update circle { fill: #e0e7ff; stroke: #6366f1; } /* 更新高度/BF */
+        .node.imbalance circle { fill: #fee2e2; stroke: #ef4444; stroke-width: 5px; stroke-dasharray: 4; } /* 最小不平衡子树根节点 */
+        .node.path circle { fill: #ffedd5; stroke: #f97316; } /* 旋转涉及路径 */
+        .node.rotated circle { fill: #d1fae5; stroke: #10b981; } /* 旋转完成 */
+
+        .edge-line {
+            stroke: #cbd5e1;
+            stroke-width: 2px;
+            fill: none;
+        }
+        .edge-line.path { stroke: #f97316; stroke-width: 4px; } /* 失衡路径高亮 */
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+    <!-- 顶部标题区 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    🌳 AVL平衡二叉树演示系统 <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408统考教材标准</span>
+                </h1>
+                <p class="text-slate-500 text-sm mt-1">演示节点插入、删除、平衡因子(BF)计算及 LL、RR、LR、RL 四种旋转调整</p>
+            </div>
+            <div class="flex gap-4 text-sm font-medium text-slate-600">
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-100 border-2 border-red-500 border-dashed"></span> 不平衡根</div>
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-orange-100 border-2 border-orange-500"></span> 旋转路径</div>
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-100 border-2 border-green-500"></span> 调整完成</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col lg:flex-row gap-4 h-[calc(100vh-80px)]">
+        
+        <!-- 左侧控制台 -->
+        <aside class="w-full lg:w-80 flex flex-col gap-4">
+            
+            <!-- 操作面板 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h2 class="font-bold text-slate-700 mb-4 border-b pb-2">🕹️ 树操作</h2>
+                <div class="flex gap-2 mb-4">
+                    <input type="number" id="node-value" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="输入整数" />
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="handleInsert()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">插入节点</button>
+                    <button onclick="handleDelete()" class="bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-medium transition">删除节点</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="randomTree()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition">随机生成树</button>
+                    <button onclick="resetTree()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition">清空重置</button>
+                </div>
+            </div>
+
+            <!-- 播放控制台 -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h2 class="font-bold text-slate-700 mb-4 border-b pb-2">⏯️ 动画控制</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <button onclick="prevStep()" id="btn-prev" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center">
+                        自动播放
+                    </button>
+                    <button onclick="nextStep()" id="btn-next" class="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                <div class="mb-2 flex justify-between text-xs text-slate-500">
+                    <span>慢速</span><span>速度</span><span>快速</span>
+                </div>
+                <input type="range" id="speed-slider" min="300" max="2000" value="1000" class="w-full" style="direction: rtl;">
+                <div class="text-center text-xs text-slate-400 mt-2" id="step-counter">步骤: 0 / 0</div>
+            </div>
+
+            <!-- 算法解说区 -->
+            <div class="bg-slate-800 rounded-xl shadow-lg border border-slate-700 p-5 flex-1 flex flex-col">
+                <h2 class="font-bold text-slate-200 mb-2 border-b border-slate-600 pb-2">💡 算法解析</h2>
+                <div id="explanation-box" class="text-slate-300 text-sm leading-relaxed overflow-y-auto no-scrollbar flex-1">
+                    等待操作...
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- 右侧画布区 -->
+        <main class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+            <!-- SVG画布，支持自适应 -->
+            <svg id="tree-svg" class="w-full h-full cursor-grab active:cursor-grabbing" viewBox="-400 -50 800 600" preserveAspectRatio="xMidYMin meet">
+                <g id="edges-layer"></g>
+                <g id="nodes-layer"></g>
+            </svg>
+        </main>
+
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心数据结构与 AVL 逻辑 (含溯源跟踪)
+ * ========================================================================= */
+let nodeIdCounter = 1;
+
+class AVLNode {
+    constructor(val) {
+        this.id = nodeIdCounter++;
+        this.val = val;
+        this.left = null;
+        this.right = null;
+        this.height = 1;
+    }
+}
+
+class AVLTree {
+    constructor() {
+        this.root = null;
+        this.steps = []; // 记录每一步的操作快照
+    }
+
+    // 获取高度
+    getHeight(node) {
+        return node ? node.height : 0;
+    }
+
+    // 计算平衡因子 BF (408标准：左子树高度 - 右子树高度)
+    getBF(node) {
+        return node ? this.getHeight(node.left) - this.getHeight(node.right) : 0;
+    }
+
+    // 深拷贝树用于快照
+    cloneTree(node) {
+        if (!node) return null;
+        const copy = { id: node.id, val: node.val, height: node.height, bf: this.getBF(node) };
+        copy.left = this.cloneTree(node.left);
+        copy.right = this.cloneTree(node.right);
+        return copy;
+    }
+
+    // 记录快照
+    snapshot(msg, highlights = {}) {
+        this.steps.push({
+            root: this.cloneTree(this.root),
+            msg: msg,
+            highlights: highlights // { id: 'active' | 'imbalance' | 'path' | 'insert' | 'delete' 等 }
+        });
+    }
+
+    /* --- 旋转操作 --- */
+    // LL型：右单旋
+    rotateRight(y) {
+        let x = y.left;
+        let T2 = x.right;
+        x.right = y;
+        y.left = T2;
+        y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+        x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+        return x;
+    }
+
+    // RR型：左单旋
+    rotateLeft(x) {
+        let y = x.right;
+        let T2 = y.left;
+        y.left = x;
+        x.right = T2;
+        x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+        y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+        return y;
+    }
+
+    /* --- 插入操作 --- */
+    insert(val) {
+        this.steps = [];
+        this.snapshot(`🌳 开始插入节点 <strong class="text-white">${val}</strong>`);
+        let wrapper = { root: this.root };
+        this._insert(wrapper, 'root', val);
+        this.root = wrapper.root;
+        this.snapshot(`✅ 节点 <strong class="text-white">${val}</strong> 插入操作完成`);
+        return this.steps;
+    }
+
+    _insert(parentObj, key, val) {
+        let node = parentObj[key];
+        
+        // 1. 标准BST插入
+        if (!node) {
+            parentObj[key] = new AVLNode(val);
+            this.snapshot(`找到空位，生成新节点 <strong class="text-white">${val}</strong>`, { [parentObj[key].id]: 'insert' });
+            return;
+        }
+
+        this.snapshot(`沿路径查找：比较目标 ${val} 与当前节点 <strong class="text-white">${node.val}</strong>`, { [node.id]: 'active' });
+
+        if (val < node.val) {
+            this._insert(node, 'left', val);
+        } else if (val > node.val) {
+            this._insert(node, 'right', val);
+        } else {
+            this.snapshot(`❌ 节点 <strong class="text-red-400">${val}</strong> 已存在，停止插入`, { [node.id]: 'error' });
+            return;
+        }
+
+        // 回溯阶段，由于指针可能在子递归中改变，重新获取当前node
+        node = parentObj[key];
+
+        // 2. 更新高度
+        node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+        let bf = this.getBF(node);
+        this.snapshot(`回溯检查：更新节点 ${node.val} 的高度为 ${node.height}，计算其平衡因子 <strong>BF = ${bf}</strong>`, { [node.id]: 'update' });
+
+        // 3. 失衡检测与四种旋转处理
+        if (bf > 1) {
+            let leftBf = this.getBF(node.left);
+            if (val < node.left.val) {
+                // LL 型
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>插入点位于其左孩子的左子树，判定为 <strong class="text-yellow-400 text-lg">LL型</strong>，准备进行 <strong>右单旋</strong>。`, { [node.id]: 'imbalance', [node.left.id]: 'path' });
+                parentObj[key] = this.rotateRight(node);
+                this.snapshot(`✨ LL型右单旋调整完成，恢复平衡`, { [parentObj[key].id]: 'rotated' });
+            } else {
+                // LR 型
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>插入点位于其左孩子的右子树，判定为 <strong class="text-yellow-400 text-lg">LR型</strong>，准备进行 <strong>先左旋后右旋</strong>。`, { [node.id]: 'imbalance', [node.left.id]: 'path', [node.left.right.id]: 'path' });
+                node.left = this.rotateLeft(node.left);
+                this.snapshot(`🔄 LR型第一步：对节点 ${node.left.val} 及其左子树进行 <strong>左单旋</strong>`, { [node.id]: 'imbalance', [node.left.id]: 'path' });
+                parentObj[key] = this.rotateRight(node);
+                this.snapshot(`✨ LR型第二步：对根节点 ${node.val} 进行 <strong>右单旋</strong>，双旋调整完成`, { [parentObj[key].id]: 'rotated' });
+            }
+        } else if (bf < -1) {
+            let rightBf = this.getBF(node.right);
+            if (val > node.right.val) {
+                // RR 型
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>插入点位于其右孩子的右子树，判定为 <strong class="text-yellow-400 text-lg">RR型</strong>，准备进行 <strong>左单旋</strong>。`, { [node.id]: 'imbalance', [node.right.id]: 'path' });
+                parentObj[key] = this.rotateLeft(node);
+                this.snapshot(`✨ RR型左单旋调整完成，恢复平衡`, { [parentObj[key].id]: 'rotated' });
+            } else {
+                // RL 型
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>插入点位于其右孩子的左子树，判定为 <strong class="text-yellow-400 text-lg">RL型</strong>，准备进行 <strong>先右旋后左旋</strong>。`, { [node.id]: 'imbalance', [node.right.id]: 'path', [node.right.left.id]: 'path' });
+                node.right = this.rotateRight(node.right);
+                this.snapshot(`🔄 RL型第一步：对节点 ${node.right.val} 及其右子树进行 <strong>右单旋</strong>`, { [node.id]: 'imbalance', [node.right.id]: 'path' });
+                parentObj[key] = this.rotateLeft(node);
+                this.snapshot(`✨ RL型第二步：对根节点 ${node.val} 进行 <strong>左单旋</strong>，双旋调整完成`, { [parentObj[key].id]: 'rotated' });
+            }
+        }
+    }
+
+    /* --- 删除操作 --- */
+    getMinValueNode(node) {
+        let current = node;
+        while (current.left != null) current = current.left;
+        return current;
+    }
+
+    delete(val) {
+        this.steps = [];
+        this.snapshot(`🗑️ 开始尝试删除节点 <strong class="text-white">${val}</strong>`);
+        let wrapper = { root: this.root };
+        this._delete(wrapper, 'root', val);
+        this.root = wrapper.root;
+        this.snapshot(`✅ 节点 <strong class="text-white">${val}</strong> 删除及调整操作结束`);
+        return this.steps;
+    }
+
+    _delete(parentObj, key, val) {
+        let node = parentObj[key];
+        if (!node) {
+            this.snapshot(`❌ 未找到目标节点 <strong class="text-red-400">${val}</strong>`);
+            return;
+        }
+
+        this.snapshot(`沿路径查找：比较目标 ${val} 与当前节点 <strong class="text-white">${node.val}</strong>`, { [node.id]: 'active' });
+
+        if (val < node.val) {
+            this._delete(node, 'left', val);
+        } else if (val > node.val) {
+            this._delete(node, 'right', val);
+        } else {
+            // 找到需要删除的节点
+            this.snapshot(`🎯 找到目标节点 ${node.val}，准备删除`, { [node.id]: 'delete' });
+            
+            if (!node.left || !node.right) {
+                // 只有0个或1个孩子
+                let temp = node.left ? node.left : node.right;
+                parentObj[key] = temp;
+                this.snapshot(`节点 ${val} 已被直接移除 (无/单分支替换)`);
+                return; // 叶子节点或单分支被删除后，通过父节点回溯更新高度
+            } else {
+                // 包含两个孩子，寻找右子树的中序后继（最小值）
+                let temp = this.getMinValueNode(node.right);
+                this.snapshot(`节点 ${val} 有左右子树，寻找其右子树的最小节点（中序后继） <strong>${temp.val}</strong> 用于值替换`, { [node.id]: 'delete', [temp.id]: 'active' });
+                
+                node.val = temp.val; // 替换值，保持ID不变以免破坏DOM绑定
+                this.snapshot(`将后继节点的值 <strong>${temp.val}</strong> 覆盖到待删除节点位置，接着去删除原后继节点`, { [node.id]: 'update' });
+                
+                this._delete(node, 'right', temp.val);
+            }
+        }
+
+        node = parentObj[key];
+        if (!node) return;
+
+        // 回溯更新高度
+        node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+        let bf = this.getBF(node);
+        this.snapshot(`回溯检查：更新节点 ${node.val} 的高度为 ${node.height}，平衡因子 <strong>BF = ${bf}</strong>`, { [node.id]: 'update' });
+
+        // 删除引起的失衡旋转
+        if (bf > 1) {
+            let leftBf = this.getBF(node.left);
+            if (leftBf >= 0) {
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>左孩子BF=${leftBf}，判定为 <strong class="text-yellow-400 text-lg">LL型</strong>，进行 <strong>右单旋</strong>`, { [node.id]: 'imbalance', [node.left.id]: 'path' });
+                parentObj[key] = this.rotateRight(node);
+                this.snapshot(`✨ LL型调整完成`, { [parentObj[key].id]: 'rotated' });
+            } else {
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>左孩子BF=${leftBf}，判定为 <strong class="text-yellow-400 text-lg">LR型</strong>，进行 <strong>先左后右双旋</strong>`, { [node.id]: 'imbalance', [node.left.id]: 'path', [node.left.right.id]: 'path' });
+                node.left = this.rotateLeft(node.left);
+                this.snapshot(`🔄 LR型第一步：左单旋完成`, { [node.id]: 'imbalance', [node.left.id]: 'path' });
+                parentObj[key] = this.rotateRight(node);
+                this.snapshot(`✨ LR型第二步：右单旋完成，树恢复平衡`, { [parentObj[key].id]: 'rotated' });
+            }
+        } else if (bf < -1) {
+            let rightBf = this.getBF(node.right);
+            if (rightBf <= 0) {
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>右孩子BF=${rightBf}，判定为 <strong class="text-yellow-400 text-lg">RR型</strong>，进行 <strong>左单旋</strong>`, { [node.id]: 'imbalance', [node.right.id]: 'path' });
+                parentObj[key] = this.rotateLeft(node);
+                this.snapshot(`✨ RR型调整完成`, { [parentObj[key].id]: 'rotated' });
+            } else {
+                this.snapshot(`⚠️ 发现<strong>最小不平衡子树</strong>根节点 ${node.val}(BF=${bf})。<br>右孩子BF=${rightBf}，判定为 <strong class="text-yellow-400 text-lg">RL型</strong>，进行 <strong>先右后左双旋</strong>`, { [node.id]: 'imbalance', [node.right.id]: 'path', [node.right.left.id]: 'path' });
+                node.right = this.rotateRight(node.right);
+                this.snapshot(`🔄 RL型第一步：右单旋完成`, { [node.id]: 'imbalance', [node.right.id]: 'path' });
+                parentObj[key] = this.rotateLeft(node);
+                this.snapshot(`✨ RL型第二步：左单旋完成，树恢复平衡`, { [parentObj[key].id]: 'rotated' });
+            }
+        }
+    }
+}
+
+/* =========================================================================
+ * 2. 渲染引擎与 UI 控制
+ * ========================================================================= */
+const avl = new AVLTree();
+let activeSteps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+// SVG 图层
+const nodesLayer = document.getElementById('nodes-layer');
+const edgesLayer = document.getElementById('edges-layer');
+const explanationBox = document.getElementById('explanation-box');
+
+// 布局计算：计算每个节点的物理坐标
+function calcLayout(node, x, y, level, layoutNodes, layoutEdges) {
+    if (!node) return;
+    
+    // 动态调整宽度，避免重叠。层级越深，间距越小，但设置最小下限
+    const dx = Math.max(40, 200 / Math.pow(1.5, level)); 
+    const dy = 70;
+
+    layoutNodes.push({ id: node.id, val: node.val, bf: node.bf, x: x, y: y });
+
+    if (node.left) {
+        layoutEdges.push({ id: `${node.id}-${node.left.id}`, fromX: x, fromY: y, toX: x - dx, toY: y + dy });
+        calcLayout(node.left, x - dx, y + dy, level + 1, layoutNodes, layoutEdges);
+    }
+    if (node.right) {
+        layoutEdges.push({ id: `${node.id}-${node.right.id}`, fromX: x, fromY: y, toX: x + dx, toY: y + dy });
+        calcLayout(node.right, x + dx, y + dy, level + 1, layoutNodes, layoutEdges);
+    }
+}
+
+// 核心渲染逻辑 (基于数据绑定和CSS Transition平滑动画)
+function renderSnapshot(step) {
+    if (!step) return;
+
+    // 1. 生成布局数据
+    const layoutNodes = [];
+    const layoutEdges = [];
+    calcLayout(step.root, 0, 50, 1, layoutNodes, layoutEdges);
+
+    // 2. 渲染解说文字
+    explanationBox.innerHTML = step.msg;
+
+    // 3. 处理节点 DOM 更新
+    const currentNodesIds = new Set();
+    layoutNodes.forEach(n => {
+        currentNodesIds.add(n.id);
+        let g = document.getElementById(`node-${n.id}`);
+        if (!g) {
+            g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("id", `node-${n.id}`);
+            // 初始出现位置(可选，让他从上方滑入)
+            g.setAttribute("transform", `translate(${n.x}, ${n.y - 20})`);
+            g.setAttribute("opacity", "0");
+            
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("r", "22");
+            
+            const textVal = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textVal.setAttribute("class", "val");
+            
+            const textBf = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textBf.setAttribute("class", "bf");
+            textBf.setAttribute("y", "35"); // 位于节点下方
+            
+            g.appendChild(circle);
+            g.appendChild(textVal);
+            g.appendChild(textBf);
+            nodesLayer.appendChild(g);
+        }
+
+        // 强迫重绘后应用实际坐标以触发动画
+        setTimeout(() => {
+            g.setAttribute("transform", `translate(${n.x}, ${n.y})`);
+            g.setAttribute("opacity", "1");
+        }, 10);
+
+        g.querySelector('.val').textContent = n.val;
+        
+        let bfText = g.querySelector('.bf');
+        bfText.textContent = `BF:${n.bf}`;
+        // BF不平衡时，文字标红
+        if(n.bf > 1 || n.bf < -1) bfText.setAttribute('fill', '#ef4444');
+        else bfText.setAttribute('fill', '#64748b');
+
+        // 应用高亮样式
+        let highlightClass = step.highlights[n.id] || '';
+        g.setAttribute("class", `node ${highlightClass}`);
+    });
+
+    // 移除废弃的节点
+    Array.from(nodesLayer.children).forEach(g => {
+        const id = parseInt(g.id.replace('node-', ''));
+        if (!currentNodesIds.has(id)) {
+            g.setAttribute("opacity", "0");
+            g.setAttribute("transform", `translate(${g.transform.baseVal[0].matrix.e}, ${g.transform.baseVal[0].matrix.f + 30})`);
+            setTimeout(() => g.remove(), 500);
+        }
+    });
+
+    // 4. 处理边 DOM 更新
+    const currentEdgesIds = new Set();
+    layoutEdges.forEach(e => {
+        currentEdgesIds.add(e.id);
+        let line = document.getElementById(`edge-${e.id}`);
+        if (!line) {
+            line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("id", `edge-${e.id}`);
+            line.setAttribute("class", "edge-line");
+            // 从父节点长出
+            line.setAttribute("x1", e.fromX); line.setAttribute("y1", e.fromY);
+            line.setAttribute("x2", e.fromX); line.setAttribute("y2", e.fromY);
+            edgesLayer.appendChild(line);
+        }
+
+        setTimeout(() => {
+            line.setAttribute("x1", e.fromX); line.setAttribute("y1", e.fromY);
+            line.setAttribute("x2", e.toX); line.setAttribute("y2", e.toY);
+        }, 10);
+
+        // 检测是否在旋转高亮路径上
+        let isPath = false;
+        let pId = parseInt(e.id.split('-')[0]);
+        let cId = parseInt(e.id.split('-')[1]);
+        if(step.highlights[pId] && step.highlights[cId]) {
+            if(step.highlights[pId] === 'path' || step.highlights[pId] === 'imbalance') {
+               if(step.highlights[cId] === 'path') isPath = true;
+            }
+        }
+        line.setAttribute("class", isPath ? "edge-line path" : "edge-line");
+    });
+
+    // 移除废弃的边
+    Array.from(edgesLayer.children).forEach(line => {
+        if (!currentEdgesIds.has(line.id.replace('edge-', ''))) {
+            line.setAttribute("opacity", "0");
+            setTimeout(() => line.remove(), 500);
+        }
+    });
+}
+
+/* =========================================================================
+ * 3. 动画与控制逻辑
+ * ========================================================================= */
+function updateControls() {
+    document.getElementById('step-counter').innerText = `步骤: ${currentStepIdx + 1} / ${activeSteps.length || 1}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= activeSteps.length - 1;
+    document.getElementById('btn-play').innerText = playInterval ? '⏸️ 暂停' : '▶️ 自动播放';
+    
+    if(playInterval) {
+        document.getElementById('btn-play').classList.replace('bg-green-500', 'bg-yellow-500');
+        document.getElementById('btn-play').classList.replace('hover:bg-green-600', 'hover:bg-yellow-600');
+    } else {
+        document.getElementById('btn-play').classList.replace('bg-yellow-500', 'bg-green-500');
+        document.getElementById('btn-play').classList.replace('hover:bg-yellow-600', 'hover:bg-green-600');
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < activeSteps.length) {
+        currentStepIdx = idx;
+        renderSnapshot(activeSteps[currentStepIdx]);
+        updateControls();
+    }
+}
+
+function nextStep() {
+    if (currentStepIdx < activeSteps.length - 1) showStep(currentStepIdx + 1);
+    else stopPlay();
+}
+
+function prevStep() {
+    if (currentStepIdx > 0) showStep(currentStepIdx - 1);
+}
+
+function togglePlay() {
+    if (playInterval) {
+        stopPlay();
+    } else {
+        if (currentStepIdx >= activeSteps.length - 1 && activeSteps.length > 0) currentStepIdx = 0; // 如果到底了重新播
+        const speed = 2300 - parseInt(document.getElementById('speed-slider').value); // 反向计算速度
+        playInterval = setInterval(nextStep, speed);
+        updateControls();
+        nextStep(); // 立即走一步
+    }
+}
+
+function stopPlay() {
+    if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        updateControls();
+    }
+}
+
+// 滑块改变时若在播放则重置计时器
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); }
+});
+
+// 操作入口包装
+function executeOp(opFunc) {
+    stopPlay();
+    const newSteps = opFunc();
+    if (newSteps && newSteps.length > 0) {
+        activeSteps = newSteps;
+        currentStepIdx = 0;
+        showStep(0);
+        togglePlay(); // 自动开始播放当前操作序列
+    }
+}
+
+function handleInsert() {
+    const val = parseInt(document.getElementById('node-value').value);
+    if (!isNaN(val)) {
+        executeOp(() => avl.insert(val));
+        document.getElementById('node-value').value = '';
+    }
+}
+
+function handleDelete() {
+    const val = parseInt(document.getElementById('node-value').value);
+    if (!isNaN(val)) {
+        executeOp(() => avl.delete(val));
+        document.getElementById('node-value').value = '';
+    }
+}
+
+function resetTree() {
+    stopPlay();
+    avl.root = null;
+    activeSteps = [{ root: null, msg: "🌲 树已清空，请插入新节点。", highlights: {} }];
+    showStep(0);
+}
+
+function randomTree() {
+    resetTree();
+    const count = 7;
+    let vals = new Set();
+    while(vals.size < count) vals.add(Math.floor(Math.random() * 100));
+    
+    // 禁用动画，快速构建
+    let finalSteps = [];
+    vals.forEach(v => {
+        let st = avl.insert(v);
+        finalSteps.push(...st);
+    });
+    
+    // 仅播放最后一个节点的插入过程，防止动画太长
+    const lastOpStart = finalSteps.length - avl.steps.length;
+    activeSteps = finalSteps.slice(Math.max(0, lastOpStart - 1)); // 截取最后一次操作的步骤
+    currentStepIdx = 0;
+    showStep(activeSteps.length - 1); // 直接跳到最终状态
+    explanationBox.innerHTML = `✅ 随机生成了 ${count} 个节点的平衡二叉树。`;
+}
+
+// 画布拖拽漫游功能
+const svg = document.getElementById('tree-svg');
+let isDragging = false, startX, startY, viewBox;
+
+svg.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    viewBox = svg.getAttribute('viewBox').split(' ').map(parseFloat);
+});
+
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = (startX - e.clientX) * 1.5; // 缩放因子
+    const dy = (startY - e.clientY) * 1.5;
+    svg.setAttribute('viewBox', `${viewBox[0] + dx} ${viewBox[1] + dy} ${viewBox[2]} ${viewBox[3]}`);
+});
+
+// 支持回车快捷键
+document.getElementById('node-value').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') handleInsert();
+});
+
+// 初始化
+window.onload = () => {
+    resetTree();
+};
+
+</script>
+</body>
+</html>

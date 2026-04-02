@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>折半查找与二叉平衡树原理解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .cell-transition { transition: all 0.3s ease; }
+        .node-transition { transition: fill 0.3s ease, stroke 0.3s ease, transform 0.3s ease; }
+        .fade-out { opacity: 0.3; filter: grayscale(100%); }
+        .pointer-bounce { animation: bounce 0.5s infinite alternate; }
+        @keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-5px); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        svg { min-width: 800px; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+
+<div class="max-w-6xl mx-auto p-6">
+    <!-- 标题区 -->
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🌲 折半查找 vs 二叉平衡树</h1>
+        <p class="text-gray-600">数组中的“折半”，其实就是在二叉搜索树中“走向左右子节点”。通过对比，一眼看懂二分查找的本质！</p>
+    </header>
+
+    <!-- 控制面板区 -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">有序数组（逗号分隔）：</label>
+            <input type="text" id="array-input" value="1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div class="w-24">
+            <label class="block text-sm font-medium text-gray-700 mb-1">查找目标：</label>
+            <input type="number" id="target-input" value="11" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <button id="btn-generate" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+            初始化/重置
+        </button>
+        <div class="h-8 border-l border-gray-300 mx-2 hidden md:block"></div>
+        <button id="btn-prev" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50">
+            &larr; 上一步
+        </button>
+        <button id="btn-next" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium disabled:opacity-50">
+            下一步 &rarr;
+        </button>
+        <button id="btn-play" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition font-medium">
+            ▶ 自动播放
+        </button>
+    </div>
+
+    <!-- 核心展示区 -->
+    <div class="space-y-6">
+        
+        <!-- 讲解气泡 -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-r-lg shadow-sm flex items-center justify-between">
+            <p id="explanation-text" class="text-lg text-blue-900 font-medium">
+                点击“初始化/重置”开始演示。
+            </p>
+            <span class="text-sm text-blue-700 bg-blue-200 px-3 py-1 rounded-full whitespace-nowrap" id="step-counter">进度: 0 / 0</span>
+        </div>
+
+        <!-- 数组视图 -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-8">数组视角 (Array View)</h3>
+            <div id="array-container" class="flex flex-row overflow-x-auto no-scrollbar gap-2 pb-12 pt-6 px-4 items-center justify-center">
+                <!-- 数组方块 -->
+            </div>
+        </div>
+
+        <!-- 树视图 -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">二叉平衡树视角 (BST View)</h3>
+            <p class="text-xs text-gray-500 mb-4">把数组的中间元素提起来作为根节点，左右半部分别作为左右子树，就得到了一棵二叉平衡树！</p>
+            <div id="tree-container" class="flex justify-center min-w-full">
+                <!-- SVG Tree -->
+                <svg id="tree-svg" width="100%" height="350" viewBox="0 0 1000 350"></svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 状态管理
+    let steps = [];
+    let currentStepIndex = 0;
+    let autoPlayInterval = null;
+    let arrayData = [];
+    let treeRoot = null;
+    let targetValue = null;
+
+    // DOM 元素
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const btnPlay = document.getElementById('btn-play');
+    const explanationText = document.getElementById('explanation-text');
+    const stepCounter = document.getElementById('step-counter');
+    const arrayContainer = document.getElementById('array-container');
+    const treeSvg = document.getElementById('tree-svg');
+
+    // 工具：构建树结构用于绘图
+    function buildTree(arr, low, high, x, y, xOffset) {
+        if (low > high) return null;
+        let mid = Math.floor((low + high) / 2);
+        let node = { val: arr[mid], idx: mid, x: x, y: y };
+        node.left = buildTree(arr, low, mid - 1, x - xOffset, y + 60, xOffset / 2);
+        node.right = buildTree(arr, mid + 1, high, x + xOffset, y + 60, xOffset / 2);
+        return node;
+    }
+
+    // 绘制树的连线
+    function drawTreeLines(node, content) {
+        if (!node) return content;
+        if (node.left) {
+            content += `<line x1="${node.x}" y1="${node.y}" x2="${node.left.x}" y2="${node.left.y}" stroke="#cbd5e1" stroke-width="2" class="node-line" data-from="${node.idx}" data-to="${node.left.idx}" />`;
+            content = drawTreeLines(node.left, content);
+        }
+        if (node.right) {
+            content += `<line x1="${node.x}" y1="${node.y}" x2="${node.right.x}" y2="${node.right.y}" stroke="#cbd5e1" stroke-width="2" class="node-line" data-from="${node.idx}" data-to="${node.right.idx}" />`;
+            content = drawTreeLines(node.right, content);
+        }
+        return content;
+    }
+
+    // 绘制树的节点
+    function drawTreeNodes(node, content) {
+        if (!node) return content;
+        content += `
+            <g class="tree-node" id="tree-node-${node.idx}">
+                <circle cx="${node.x}" cy="${node.y}" r="18" fill="white" stroke="#94a3b8" stroke-width="2" class="node-transition" />
+                <text x="${node.x}" y="${node.y + 5}" font-size="14" text-anchor="middle" fill="#334155" font-weight="bold">${node.val}</text>
+            </g>
+        `;
+        if (node.left) content = drawTreeNodes(node.left, content);
+        if (node.right) content = drawTreeNodes(node.right, content);
+        return content;
+    }
+
+    function initSVGTree() {
+        if (!treeRoot) return;
+        let svgContent = drawTreeLines(treeRoot, "");
+        svgContent = drawTreeNodes(treeRoot, svgContent);
+        treeSvg.innerHTML = svgContent;
+    }
+
+    // 核心：模拟折半查找并生成步骤序列
+    function generateSteps(arr, target) {
+        steps = [];
+        let low = 0;
+        let high = arr.length - 1;
+        
+        steps.push({
+            low, high, mid: null, target, phase: 'init',
+            msg: `<strong>初始状态：</strong> 搜索区间为整个数组 <code>[${low}, ${high}]</code>。要查找的目标值是 <span class="text-green-600 font-bold">${target}</span>。`
+        });
+
+        while (low <= high) {
+            let mid = Math.floor((low + high) / 2);
+            let midVal = arr[mid];
+
+            steps.push({
+                low, high, mid, target, phase: 'compare',
+                msg: `<strong>计算中点：</strong> <code>mid = Math.floor((${low} + ${high}) / 2) = ${mid}</code>。<br>取出中点值 <code>arr[${mid}] = ${midVal}</code>，它也是当前树的<strong>根节点</strong>，与目标 ${target} 比较。`
+            });
+
+            if (midVal === target) {
+                steps.push({
+                    low, high, mid, target, phase: 'found',
+                    msg: `🎉 <strong>匹配成功！</strong> <code>${midVal} == ${target}</code>。<br>我们在数组索引 ${mid}（也就是树的当前节点）找到了目标！`
+                });
+                return;
+            } else if (midVal < target) {
+                let oldLow = low;
+                low = mid + 1;
+                steps.push({
+                    low, high: high, mid, target, phase: 'right', oldLow,
+                    msg: `<strong>向右查找：</strong> 因为 <code>${midVal} < ${target}</code>，目标只可能在右半边。<br>在数组中 <code>low = mid + 1 = ${low}</code>。在树中，这意味着我们<strong>走向右子节点</strong>！`
+                });
+            } else {
+                let oldHigh = high;
+                high = mid - 1;
+                steps.push({
+                    low: low, high, mid, target, phase: 'left', oldHigh,
+                    msg: `<strong>向左查找：</strong> 因为 <code>${midVal} > ${target}</code>，目标只可能在左半边。<br>在数组中 <code>high = mid - 1 = ${high}</code>。在树中，这意味着我们<strong>走向左子节点</strong>！`
+                });
+            }
+        }
+
+        steps.push({
+            low, high, mid: null, target, phase: 'not_found',
+            msg: `❌ <strong>查找失败！</strong> 此时 <code>low (${low}) > high (${high})</code>，搜索区间为空。<br>在树中，这意味着我们已经走到了叶子节点的尽头，仍未找到目标值 ${target}。`
+        });
+    }
+
+    // 渲染 UI 步骤
+    function renderStep(index) {
+        if (index < 0 || index >= steps.length) return;
+        const state = steps[index];
+        
+        // 1. 更新文本
+        explanationText.innerHTML = state.msg;
+        stepCounter.innerText = `进度: ${index + 1} / ${steps.length}`;
+
+        // 2. 渲染数组
+        arrayContainer.innerHTML = '';
+        for (let i = 0; i < arrayData.length; i++) {
+            const isMid = i === state.mid;
+            const inRange = i >= state.low && i <= state.high;
+            const isTarget = arrayData[i] === state.target;
+            const isFound = state.phase === 'found' && isMid;
+
+            let bgColor = 'bg-white';
+            let borderColor = 'border-gray-200';
+            if (isFound) { bgColor = 'bg-green-100'; borderColor = 'border-green-500'; }
+            else if (isMid) { bgColor = 'bg-yellow-100'; borderColor = 'border-yellow-400'; }
+
+            const cellHtml = `
+                <div class="flex flex-col items-center min-w-[3.5rem] cell-transition ${!inRange && !isFound && state.phase !== 'init' ? 'fade-out' : ''}">
+                    <!-- Top Pointers (mid) -->
+                    <div class="h-8 flex items-end justify-center pb-1">
+                        ${isMid ? `<span class="text-yellow-600 font-bold pointer-bounce text-xs flex flex-col items-center"><span>mid</span>↓</span>` : ''}
+                    </div>
+                    
+                    <!-- Block -->
+                    <div class="border-2 ${borderColor} ${bgColor} rounded-lg overflow-hidden w-full relative ${isMid ? 'transform scale-110 shadow-md z-10' : ''}">
+                        <div class="bg-gray-100 text-[10px] text-gray-500 text-center py-0.5 border-b">
+                            [${i}]
+                        </div>
+                        <div class="text-lg font-bold text-center py-2 text-gray-800">
+                            ${arrayData[i]}
+                        </div>
+                    </div>
+                    
+                    <!-- Bottom Pointers (low, high) -->
+                    <div class="h-8 flex items-start justify-center pt-1 text-xs font-bold gap-1">
+                        ${i === state.low ? `<span class="text-blue-500 pointer-bounce">↑low</span>` : ''}
+                        ${i === state.high ? `<span class="text-red-500 pointer-bounce">↑high</span>` : ''}
+                    </div>
+                </div>
+            `;
+            arrayContainer.insertAdjacentHTML('beforeend', cellHtml);
+        }
+
+        // 3. 渲染树 (修改 SVG 属性)
+        document.querySelectorAll('.tree-node').forEach(g => {
+            const idx = parseInt(g.id.split('-')[2]);
+            const circle = g.querySelector('circle');
+            const inRange = idx >= state.low && idx <= state.high;
+            const isMid = idx === state.mid;
+            const isFound = state.phase === 'found' && isMid;
+
+            // 重置样式
+            g.classList.remove('fade-out');
+            circle.setAttribute('fill', 'white');
+            circle.setAttribute('stroke', '#94a3b8');
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('transform', '');
+
+            if (!inRange && !isFound && state.phase !== 'init') {
+                g.classList.add('fade-out');
+            }
+
+            if (isFound) {
+                circle.setAttribute('fill', '#dcfce7'); // green-100
+                circle.setAttribute('stroke', '#22c55e'); // green-500
+                circle.setAttribute('stroke-width', '4');
+            } else if (isMid) {
+                circle.setAttribute('fill', '#fef9c3'); // yellow-100
+                circle.setAttribute('stroke', '#eab308'); // yellow-500
+                circle.setAttribute('stroke-width', '4');
+            }
+        });
+
+        // 按钮状态
+        btnPrev.disabled = index === 0;
+        btnNext.disabled = index === steps.length - 1;
+    }
+
+    // 控制流
+    function init() {
+        stopPlay();
+        
+        // 解析输入
+        const rawArray = document.getElementById('array-input').value;
+        const rawTarget = document.getElementById('target-input').value;
+        
+        // 处理数组：去重并排序
+        let parsed = rawArray.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        parsed = [...new Set(parsed)].sort((a, b) => a - b);
+        
+        if (parsed.length === 0) {
+            alert("请输入有效的数字数组！");
+            return;
+        }
+        
+        targetValue = parseInt(rawTarget);
+        if (isNaN(targetValue)) {
+            alert("请输入有效的查找目标数字！");
+            return;
+        }
+
+        // 更新输入框为规范化后的数组
+        arrayData = parsed;
+        document.getElementById('array-input').value = arrayData.join(', ');
+
+        // 构建树并绘制
+        treeRoot = buildTree(arrayData, 0, arrayData.length - 1, 500, 30, 250);
+        initSVGTree();
+
+        // 跑算法生成步骤
+        generateSteps(arrayData, targetValue);
+        
+        currentStepIndex = 0;
+        renderStep(currentStepIndex);
+    }
+
+    function goNext() {
+        if (currentStepIndex < steps.length - 1) {
+            currentStepIndex++;
+            renderStep(currentStepIndex);
+        } else {
+            stopPlay();
+        }
+    }
+
+    function goPrev() {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            renderStep(currentStepIndex);
+        }
+    }
+
+    function togglePlay() {
+        if (autoPlayInterval) {
+            stopPlay();
+        } else {
+            if (currentStepIndex === steps.length - 1) {
+                currentStepIndex = 0;
+            }
+            btnPlay.innerHTML = "⏸ 暂停播放";
+            btnPlay.classList.replace('bg-green-100', 'bg-yellow-100');
+            btnPlay.classList.replace('text-green-700', 'text-yellow-700');
+            
+            // 立即走一步，然后定时
+            if(currentStepIndex === 0) renderStep(0); 
+            autoPlayInterval = setInterval(goNext, 1800); // 间隔1.8秒
+        }
+    }
+
+    function stopPlay() {
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+            btnPlay.innerHTML = "▶ 自动播放";
+            btnPlay.classList.replace('bg-yellow-100', 'bg-green-100');
+            btnPlay.classList.replace('text-yellow-700', 'text-green-700');
+        }
+    }
+
+    // 绑定事件
+    btnGenerate.addEventListener('click', init);
+    btnNext.addEventListener('click', () => { stopPlay(); goNext(); });
+    btnPrev.addEventListener('click', () => { stopPlay(); goPrev(); });
+    btnPlay.addEventListener('click', togglePlay);
+
+    // 回车快捷键
+    document.getElementById('target-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') init();
+    });
+
+    // 页面加载自动初始化
+    window.onload = init;
+
+</script>
+</body>
+</html>
