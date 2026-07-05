@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单链表就地逆置 (头插法) 动画演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        .code-line { transition: all 0.2s ease; padding-left: 1rem; border-left: 4px solid transparent; margin: 2px 0; }
+        .code-line.active { background-color: rgba(234, 179, 8, 0.2); border-left-color: #eab308; }
+        
+        .pointer-label { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        svg path { transition: d 0.3s ease; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden font-sans">
+
+    <!-- 左侧：代码区 -->
+    <div class="w-full md:w-1/3 bg-gray-800 flex flex-col border-r border-gray-700 h-1/2 md:h-full">
+        <div class="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center z-10 shadow-md">
+            <h2 class="text-lg font-bold text-blue-400">代码执行逻辑</h2>
+            <div class="flex gap-2">
+                <span class="px-2 py-1 text-xs rounded bg-purple-900 text-purple-300">L</span>
+                <span class="px-2 py-1 text-xs rounded bg-pink-900 text-pink-300">p</span>
+                <span class="px-2 py-1 text-xs rounded bg-green-900 text-green-300">r</span>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 font-mono text-sm leading-relaxed text-gray-300">
+            <div id="line-0">void Reverse(LinkList &L) {</div>
+            <div id="line-1" class="code-line text-gray-400">    // L是带头结点的单链表</div>
+            <div id="line-2" class="code-line">    LNode *p = L->next;</div>
+            <div id="line-3" class="code-line">    LNode *r;</div>
+            <div id="line-4" class="code-line">    </div>
+            <div id="line-5" class="code-line">    L->next = NULL;</div>
+            <div id="line-6" class="code-line">    </div>
+            <div id="line-7" class="code-line">    while (p != NULL) {</div>
+            <div id="line-8" class="code-line">        r = p->next; <span class="text-green-400">// ① 保存后继防断链</span></div>
+            <div id="line-9" class="code-line">        </div>
+            <div id="line-10" class="code-line">        p->next = L->next; <span class="text-pink-400">// ② p指向新首结点</span></div>
+            <div id="line-11" class="code-line">        L->next = p;       <span class="text-blue-400">// ③ 头结点指向p</span></div>
+            <div id="line-12" class="code-line">        </div>
+            <div id="line-13" class="code-line">        p = r; <span class="text-gray-400">// ④ p移向下一结点</span></div>
+            <div id="line-14" class="code-line">    }</div>
+            <div id="line-15">}</div>
+        </div>
+    </div>
+
+    <!-- 右侧：可视化区 -->
+    <div class="w-full md:w-2/3 flex flex-col h-1/2 md:h-full relative bg-gray-50 text-gray-900">
+        
+        <!-- 解释提示框 -->
+        <div class="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur shadow-lg rounded-xl p-4 border border-gray-200 z-20">
+            <h3 class="font-bold text-lg mb-1 text-gray-800">当前步骤解析：</h3>
+            <p id="explanation-text" class="text-gray-600 whitespace-pre-line leading-relaxed">点击下方控制按钮开始演示。</p>
+        </div>
+
+        <!-- 可视化画布 -->
+        <div class="flex-1 relative overflow-auto min-w-full" id="canvas-container">
+            <div class="absolute inset-0 min-w-[900px] min-h-[500px]">
+                <!-- SVG箭头层 -->
+                <svg id="arrows-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+                
+                <!-- DOM节点层 -->
+                <div id="nodes-layer" class="absolute inset-0 z-20 pointer-events-none"></div>
+
+                <!-- 指针标签层 -->
+                <div id="pointer-L" class="pointer-label absolute px-3 py-1 bg-purple-100 border-2 border-purple-500 text-purple-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-full">
+                    L
+                    <div class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-purple-500"></div>
+                </div>
+                
+                <div id="pointer-p" class="pointer-label absolute px-3 py-1 bg-pink-100 border-2 border-pink-500 text-pink-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0">
+                    <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-pink-500"></div>
+                    p
+                </div>
+                
+                <div id="pointer-r" class="pointer-label absolute px-3 py-1 bg-green-100 border-2 border-green-500 text-green-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0">
+                    <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-green-500"></div>
+                    r
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="bg-white border-t border-gray-200 p-4 flex justify-center items-center gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+            <button id="btn-reset" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                重置
+            </button>
+            <button id="btn-prev" class="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition flex items-center gap-1 disabled:opacity-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                上一步
+            </button>
+            <span class="text-sm font-bold text-gray-500 w-16 text-center" id="step-counter">0 / 15</span>
+            <button id="btn-next" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition shadow-md shadow-blue-500/30 flex items-center gap-1 disabled:opacity-50">
+                下一步
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <button id="btn-auto" class="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                自动播放
+            </button>
+        </div>
+    </div>
+
+<script>
+    // 节点位置定义 (中心点 cx, cy)
+    // Head: X=120, N1: X=320, N2: X=520, N3: X=720, Y=250
+    const nodesData = {
+        Head: { cx: 120, cy: 260, label: "Head" },
+        N1: { cx: 320, cy: 260, label: "1" },
+        N2: { cx: 520, cy: 260, label: "2" },
+        N3: { cx: 720, cy: 260, label: "3" }
+    };
+
+    // 状态机数组
+    const states = [
+        {
+            lineId: 'line-1',
+            msg: "【初始状态】\n链表带有头结点，数据序列为 1 -> 2 -> 3。",
+            pointers: { L: 'Head', p: null, r: null },
+            nexts: { Head: 'N1', N1: 'N2', N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-2',
+            msg: "【LNode *p = L->next;】\n定义指针 p，指向原链表的第一个数据结点 (1)。\n这是我们要处理的第一个元素。",
+            pointers: { L: 'Head', p: 'N1', r: null },
+            nexts: { Head: 'N1', N1: 'N2', N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-5',
+            msg: "【L->next = NULL;】\n核心准备：将头结点的 next 置为 NULL。\n这意味着我们人为地把链表**断开**了。现在形成了一个只有头结点的“空的新链表”，而 p 还牵着后面的“旧链表”。",
+            pointers: { L: 'Head', p: 'N1', r: null },
+            nexts: { Head: null, N1: 'N2', N2: 'N3', N3: null }
+        },
+        // ========== 循环 1 (处理节点 1) ==========
+        {
+            lineId: 'line-7',
+            msg: "【while (p != NULL)】\n当前 p 指向结点 (1)，不为空，进入循环。开始进行头插操作。",
+            pointers: { L: 'Head', p: 'N1', r: null },
+            nexts: { Head: null, N1: 'N2', N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-8',
+            msg: "【r = p->next;】\n①防断链：用 r 记录 p 的下一个结点 (2)。\n因为接下来要改变 p 的指针方向，如果不提前记住，后面的链表就永远丢失了！",
+            pointers: { L: 'Head', p: 'N1', r: 'N2' },
+            nexts: { Head: null, N1: 'N2', N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-10',
+            msg: "【p->next = L->next;】\n②头插前奏：将 p(1) 接到“新链表”的开头。\n当前新链表首元是 NULL (即 L->next)，所以让 1 的 next 指向 NULL。",
+            pointers: { L: 'Head', p: 'N1', r: 'N2' },
+            nexts: { Head: null, N1: null, N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-11',
+            msg: "【L->next = p;】\n③头插完成：让头结点指向 p(1)。\n结点 (1) 成功被插入到了新链表的头部！",
+            pointers: { L: 'Head', p: 'N1', r: 'N2' },
+            nexts: { Head: 'N1', N1: null, N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-13',
+            msg: "【p = r;】\n④推进：p 移动到之前保存的结点 (2)，准备在下一轮循环中处理它。",
+            pointers: { L: 'Head', p: 'N2', r: 'N2' },
+            nexts: { Head: 'N1', N1: null, N2: 'N3', N3: null }
+        },
+        // ========== 循环 2 (处理节点 2) ==========
+        {
+            lineId: 'line-7',
+            msg: "【while (p != NULL)】\n当前 p 指向结点 (2)，不为空，继续循环。",
+            pointers: { L: 'Head', p: 'N2', r: 'N2' },
+            nexts: { Head: 'N1', N1: null, N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-8',
+            msg: "【r = p->next;】\n①防断链：r 记录 p 的下一个结点 (3)。保证旧链表不丢。",
+            pointers: { L: 'Head', p: 'N2', r: 'N3' },
+            nexts: { Head: 'N1', N1: null, N2: 'N3', N3: null }
+        },
+        {
+            lineId: 'line-10',
+            msg: "【p->next = L->next;】\n②头插前奏：关键点来了！现在 L->next 是结点 (1)。\n所以让 p(2) 的 next 指向结点 (1)。",
+            pointers: { L: 'Head', p: 'N2', r: 'N3' },
+            nexts: { Head: 'N1', N1: null, N2: 'N1', N3: null }
+        },
+        {
+            lineId: 'line-11',
+            msg: "【L->next = p;】\n③头插完成：头结点改指向 p(2)。\n此时新链表变成了 Head -> 2 -> 1 -> NULL。结点(2)把结点(1)挤到了后面，这就实现了逆置！",
+            pointers: { L: 'Head', p: 'N2', r: 'N3' },
+            nexts: { Head: 'N2', N1: null, N2: 'N1', N3: null }
+        },
+        {
+            lineId: 'line-13',
+            msg: "【p = r;】\n④推进：p 移动到结点 (3)。",
+            pointers: { L: 'Head', p: 'N3', r: 'N3' },
+            nexts: { Head: 'N2', N1: null, N2: 'N1', N3: null }
+        },
+        // ========== 循环 3 (处理节点 3) ==========
+        {
+            lineId: 'line-8',
+            msg: "【r = p->next;】\n处理最后一个结点(3)。r 指向它的下一个，也就是 NULL。",
+            pointers: { L: 'Head', p: 'N3', r: null },
+            nexts: { Head: 'N2', N1: null, N2: 'N1', N3: null }
+        },
+        {
+            lineId: 'line-10',
+            msg: "【p->next = L->next;】\n将 p(3) 的 next 指向当前新链表的首元，也就是结点 (2)。",
+            pointers: { L: 'Head', p: 'N3', r: null },
+            nexts: { Head: 'N2', N1: null, N2: 'N1', N3: 'N2' }
+        },
+        {
+            lineId: 'line-11',
+            msg: "【L->next = p;】\n头结点改指向 p(3)。\n新链表变为 Head -> 3 -> 2 -> 1 -> NULL。",
+            pointers: { L: 'Head', p: 'N3', r: null },
+            nexts: { Head: 'N3', N1: null, N2: 'N1', N3: 'N2' }
+        },
+        {
+            lineId: 'line-13',
+            msg: "【p = r;】\n④推进：p 移动到 r，也就是 NULL。",
+            pointers: { L: 'Head', p: null, r: null },
+            nexts: { Head: 'N3', N1: null, N2: 'N1', N3: 'N2' }
+        },
+        // ========== 结束 ==========
+        {
+            lineId: 'line-7',
+            msg: "【while (p != NULL)】\n判断此时 p 为 NULL，循环终止！\n\n逆置成功！可以看到新链表的顺序已经完全反转。",
+            pointers: { L: 'Head', p: null, r: null },
+            nexts: { Head: 'N3', N1: null, N2: 'N1', N3: 'N2' }
+        }
+    ];
+
+    let currentStepIndex = 0;
+    let autoPlayInterval = null;
+
+    // 初始化渲染 DOM 节点
+    function initNodes() {
+        const container = document.getElementById('nodes-layer');
+        container.innerHTML = '';
+        
+        for (const [id, data] of Object.entries(nodesData)) {
+            // Node size: 100x44. cx, cy is center.
+            const left = data.cx - 50;
+            const top = data.cy - 22;
+            
+            const isHead = id === 'Head';
+            const dataColor = isHead ? 'bg-purple-50 text-purple-800' : 'bg-blue-50 text-blue-800';
+            
+            const nodeHtml = `
+                <div class="absolute w-[100px] h-[44px] border-2 border-gray-400 rounded flex overflow-hidden shadow-lg bg-white" style="left: ${left}px; top: ${top}px;">
+                    <div class="w-[60%] border-r-2 border-gray-400 flex items-center justify-center font-bold font-mono text-lg ${dataColor}">
+                        ${data.label}
+                    </div>
+                    <div class="w-[40%] flex items-center justify-center bg-gray-100">
+                        <div class="w-2.5 h-2.5 rounded-full bg-gray-500"></div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += nodeHtml;
+        }
+    }
+
+    // 绘制箭头连线
+    function drawArrows(nextsMap) {
+        const svg = document.getElementById('arrows-svg');
+        let svgContent = `
+            <defs>
+                <marker id="arrowHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
+                </marker>
+                <marker id="arrowNull" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af" />
+                </marker>
+            </defs>
+        `;
+
+        for (const [fromId, toId] of Object.entries(nextsMap)) {
+            const fromNode = nodesData[fromId];
+            // 指针框中心点: Node宽度100, 左半60, 右半40. 中心为左侧起 60+20=80. 
+            // 相对于中心点cx: cx - 50 + 80 = cx + 30
+            const startX = fromNode.cx + 30;
+            const startY = fromNode.cy;
+
+            if (toId === null) {
+                // 指向 NULL: 向下画短线
+                const endX = startX;
+                const endY = startY + 60;
+                svgContent += `
+                    <path d="M ${startX} ${startY} L ${endX} ${endY}" stroke="#9ca3af" stroke-width="3" fill="none" marker-end="url(#arrowNull)" />
+                    <text x="${endX}" y="${endY + 20}" fill="#9ca3af" font-size="16" font-weight="bold" font-family="monospace" text-anchor="middle">NULL</text>
+                `;
+            } else {
+                const toNode = nodesData[toId];
+                // 目标节点左边缘: toNode.cx - 50
+                const endX = toNode.cx - 54; // 减去箭头长度，避免箭头被盖住
+                const endY = toNode.cy;
+
+                const diffX = toNode.cx - fromNode.cx;
+                let d = "";
+
+                if (diffX === 200) {
+                    // 相邻向右: 直线
+                    d = `M ${startX} ${startY} L ${endX} ${endY}`;
+                } else if (diffX > 200) {
+                    // 跨越向右: 向上弯曲
+                    const midX = (startX + endX) / 2;
+                    const controlY = startY - (diffX * 0.25);
+                    d = `M ${startX} ${startY} Q ${midX} ${controlY} ${endX} ${endY}`;
+                } else if (diffX < 0) {
+                    // 向左指 (逆置后的新连接): 向下弯曲
+                    const midX = (startX + endX) / 2;
+                    // 根据距离计算下弯曲程度，避免交叉太混乱
+                    const depth = Math.abs(diffX) * 0.25 + 30; 
+                    const controlY = startY + depth;
+                    d = `M ${startX} ${startY} Q ${midX} ${controlY} ${endX} ${endY}`;
+                }
+
+                // 区分“旧链接”(向右) 和 “新链接”(向左) 的颜色，让逆置过程更明显
+                const strokeColor = diffX < 0 ? "#2563eb" : "#60a5fa"; 
+
+                svgContent += `
+                    <path d="${d}" stroke="${strokeColor}" stroke-width="3" fill="none" marker-end="url(#arrowHead)" stroke-dasharray="${diffX > 0 && currentStepIndex > 1 ? '4,4' : 'none'}" />
+                `;
+            }
+        }
+        svg.innerHTML = svgContent;
+    }
+
+    // 更新视图到指定步骤
+    function renderStep(index) {
+        const state = states[index];
+
+        // 1. 更新解释文本
+        document.getElementById('explanation-text').innerHTML = state.msg.replace(/p\(/g, '<span class="text-pink-600 font-bold">p</span>(')
+                                                                           .replace(/ p /g, ' <span class="text-pink-600 font-bold">p</span> ')
+                                                                           .replace(/r\(/g, '<span class="text-green-600 font-bold">r</span>(')
+                                                                           .replace(/ r /g, ' <span class="text-green-600 font-bold">r</span> ')
+                                                                           .replace(/L->/g, '<span class="text-purple-600 font-bold">L</span>->');
+
+        // 2. 更新代码高亮
+        document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+        if (state.lineId) {
+            const activeLine = document.getElementById(state.lineId);
+            if(activeLine) {
+                activeLine.classList.add('active');
+                // 滚动代码区以保证高亮行可见
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 3. 更新指针位置
+        const pLabel = document.getElementById('pointer-p');
+        const rLabel = document.getElementById('pointer-r');
+        const lLabel = document.getElementById('pointer-L');
+
+        // L 指针永远指在 Head 上方
+        lLabel.style.left = `${nodesData.Head.cx}px`;
+        lLabel.style.top = `${nodesData.Head.cy - 50}px`;
+
+        if (state.pointers.p) {
+            pLabel.style.opacity = '1';
+            // 放在节点下方偏左
+            pLabel.style.left = `${nodesData[state.pointers.p].cx - 15}px`;
+            pLabel.style.top = `${nodesData[state.pointers.p].cy + 40}px`;
+        } else {
+            pLabel.style.opacity = '0';
+            pLabel.style.top = `${nodesData.Head.cy + 100}px`; // 移出画面
+        }
+
+        if (state.pointers.r) {
+            rLabel.style.opacity = '1';
+            // 放在节点下方偏右，防止和p重叠
+            rLabel.style.left = `${nodesData[state.pointers.r].cx + 15}px`;
+            rLabel.style.top = `${nodesData[state.pointers.r].cy + 40}px`;
+        } else {
+            rLabel.style.opacity = '0';
+            rLabel.style.top = `${nodesData.Head.cy + 100}px`;
+        }
+
+        // 4. 绘制连线
+        drawArrows(state.nexts);
+
+        // 5. 更新控制面板
+        document.getElementById('step-counter').innerText = `${index} / ${states.length - 1}`;
+        document.getElementById('btn-prev').disabled = index === 0;
+        document.getElementById('btn-next').disabled = index === states.length - 1;
+    }
+
+    // 事件监听
+    document.getElementById('btn-next').addEventListener('click', () => {
+        if (currentStepIndex < states.length - 1) {
+            currentStepIndex++;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        stopAutoPlay();
+        currentStepIndex = 0;
+        renderStep(currentStepIndex);
+    });
+
+    const btnAuto = document.getElementById('btn-auto');
+    function toggleAutoPlay() {
+        if (autoPlayInterval) {
+            stopAutoPlay();
+        } else {
+            btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg> 暂停`;
+            btnAuto.classList.replace('bg-purple-100', 'bg-red-100');
+            btnAuto.classList.replace('text-purple-700', 'text-red-700');
+            autoPlayInterval = setInterval(() => {
+                if (currentStepIndex < states.length - 1) {
+                    currentStepIndex++;
+                    renderStep(currentStepIndex);
+                } else {
+                    stopAutoPlay();
+                }
+            }, 1800); // 每步间隔1.8秒
+        }
+    }
+
+    function stopAutoPlay() {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+        btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 自动播放`;
+        btnAuto.classList.replace('bg-red-100', 'bg-purple-100');
+        btnAuto.classList.replace('text-red-700', 'text-purple-700');
+    }
+
+    btnAuto.addEventListener('click', toggleAutoPlay);
+
+    // 页面加载完成后初始化
+    window.onload = () => {
+        initNodes();
+        renderStep(0);
+    };
+
+</script>
+</body>
+</html>

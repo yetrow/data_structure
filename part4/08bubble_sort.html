@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冒泡排序 C 语言动画演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .code-line { transition: background-color 0.25s, border-color 0.25s; padding: 2px 8px; border-left: 4px solid transparent; border-radius: 4px; display: block; }
+        .active-line { background-color: rgba(234, 179, 8, 0.35); border-left-color: #eab308; }
+        .bar { transition: height 0.35s ease, background-color 0.25s ease, transform 0.25s ease; }
+        .cell { transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.25s ease; }
+        .lift { transform: translateY(-10px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+
+<div class="max-w-6xl mx-auto p-6">
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">冒泡排序：C 语言逐步动画演示</h1>
+        <p class="text-gray-600">观察相邻元素如何比较、交换，每一轮把当前最大的元素“冒泡”到未排序区末尾。</p>
+    </header>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[240px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">数组元素（逗号分隔）：</label>
+            <input type="text" id="array-input" value="64, 34, 25, 12, 22, 11, 90"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                   placeholder="例如 64, 34, 25, 12, 22, 11, 90">
+        </div>
+        <button id="btn-generate" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+            初始化/重置
+        </button>
+        <div class="h-8 border-l border-gray-300 mx-2 hidden md:block"></div>
+        <button id="btn-prev" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50">
+            &larr; 上一步
+        </button>
+        <button id="btn-next" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium disabled:opacity-50">
+            下一步 &rarr;
+        </button>
+        <button id="btn-play" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition font-medium">
+            自动播放
+        </button>
+        <span class="text-sm text-gray-500 ml-auto" id="step-counter">进度: 0 / 0</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="space-y-6">
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-r-lg shadow-sm min-h-[96px] flex items-center">
+                <p id="explanation-text" class="text-lg text-blue-900">
+                    点击“初始化/重置”开始演示。
+                </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center justify-between mb-5">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">柱状图视图</h3>
+                    <span id="pass-label" class="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">第 0 轮</span>
+                </div>
+                <div id="bar-container" class="h-72 flex items-end justify-center gap-3 overflow-x-auto no-scrollbar px-2 pb-4">
+                    <!-- 动态生成柱状图 -->
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-5">数组内存视图</h3>
+                <div id="array-container" class="flex flex-row overflow-x-auto no-scrollbar gap-2 pb-3 px-2 items-center justify-center">
+                    <!-- 动态生成数组单元格 -->
+                </div>
+                <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-amber-400"></span>正在比较</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-red-400"></span>需要交换</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-emerald-400"></span>已排序</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-slate-300"></span>未排序</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-gray-900 text-gray-100 p-5 rounded-xl shadow-sm overflow-x-auto">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">C 语言实现</h3>
+                <pre class="text-sm leading-7"><code id="code-block"><span class="code-line" data-line="1">void bubble_sort(int a[], int size)</span>
+<span class="code-line" data-line="2">{</span>
+<span class="code-line" data-line="3">    for (int i = 0; i &lt; size - 1; i++)</span>
+<span class="code-line" data-line="4">    {</span>
+<span class="code-line" data-line="5">        for (int j = 0; j &lt; size - i - 1; j++)</span>
+<span class="code-line" data-line="6">        {</span>
+<span class="code-line" data-line="7">            if (a[j] &gt; a[j + 1])</span>
+<span class="code-line" data-line="8">            {</span>
+<span class="code-line" data-line="9">                int temp = a[j];</span>
+<span class="code-line" data-line="10">                a[j] = a[j + 1];</span>
+<span class="code-line" data-line="11">                a[j + 1] = temp;</span>
+<span class="code-line" data-line="12">            }</span>
+<span class="code-line" data-line="13">        }</span>
+<span class="code-line" data-line="14">    }</span>
+<span class="code-line" data-line="15">}</span></code></pre>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">算法要点</h3>
+                <ul class="space-y-3 text-gray-700 leading-relaxed">
+                    <li><strong>比较对象：</strong>冒泡排序每次只比较相邻的 <code class="text-blue-700">a[j]</code> 和 <code class="text-blue-700">a[j + 1]</code>。</li>
+                    <li><strong>交换条件：</strong>升序排序时，如果左边比右边大，就交换它们。</li>
+                    <li><strong>轮次边界：</strong>第 <code class="text-blue-700">i</code> 轮结束后，末尾 <code class="text-blue-700">i + 1</code> 个元素已经有序，内层循环可以少比较这些位置。</li>
+                    <li><strong>时间复杂度：</strong>两层循环决定了平均和最坏时间复杂度都是 <code class="text-blue-700">O(n^2)</code>。</li>
+                </ul>
+            </div>
+
+            <div class="bg-slate-800 text-slate-200 p-5 rounded-xl text-sm leading-relaxed">
+                <h4 class="text-white font-bold mb-2">本页演示的关键修正</h4>
+                <p>
+                    冒泡排序的交换条件应比较相邻元素：<code class="text-amber-300">a[j] &gt; a[j + 1]</code>。
+                    如果写成 <code class="text-amber-300">a[j] &lt; a[i]</code>，比较对象就不是当前相邻对，排序过程会偏离冒泡排序的逻辑。
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const input = document.getElementById('array-input');
+    const generateBtn = document.getElementById('btn-generate');
+    const prevBtn = document.getElementById('btn-prev');
+    const nextBtn = document.getElementById('btn-next');
+    const playBtn = document.getElementById('btn-play');
+    const stepCounter = document.getElementById('step-counter');
+    const explanationText = document.getElementById('explanation-text');
+    const passLabel = document.getElementById('pass-label');
+    const barContainer = document.getElementById('bar-container');
+    const arrayContainer = document.getElementById('array-container');
+    const codeLines = document.querySelectorAll('.code-line');
+
+    let steps = [];
+    let currentStep = 0;
+    let playTimer = null;
+
+    function parseArray() {
+        const values = input.value
+            .split(',')
+            .map(item => Number(item.trim()))
+            .filter(value => Number.isFinite(value));
+        return values.length > 1 ? values.slice(0, 12) : [64, 34, 25, 12, 22, 11, 90];
+    }
+
+    function buildSteps(source) {
+        const arr = [...source];
+        const result = [{
+            array: [...arr],
+            compare: [],
+            sortedFrom: arr.length,
+            pass: 0,
+            line: 1,
+            message: `准备对数组 [${arr.join(', ')}] 进行升序冒泡排序。`
+        }];
+
+        for (let i = 0; i < arr.length - 1; i++) {
+            result.push({
+                array: [...arr],
+                compare: [],
+                sortedFrom: arr.length - i,
+                pass: i + 1,
+                line: 3,
+                message: `开始第 ${i + 1} 轮：本轮会把未排序区中最大的元素送到右侧边界。`
+            });
+
+            for (let j = 0; j < arr.length - i - 1; j++) {
+                result.push({
+                    array: [...arr],
+                    compare: [j, j + 1],
+                    sortedFrom: arr.length - i,
+                    pass: i + 1,
+                    line: 5,
+                    message: `内层循环 j = ${j}，准备比较 a[${j}] 和 a[${j + 1}]。`
+                });
+
+                const shouldSwap = arr[j] > arr[j + 1];
+                result.push({
+                    array: [...arr],
+                    compare: [j, j + 1],
+                    swap: shouldSwap,
+                    sortedFrom: arr.length - i,
+                    pass: i + 1,
+                    line: 7,
+                    message: shouldSwap
+                        ? `${arr[j]} > ${arr[j + 1]}，顺序不对，需要交换。`
+                        : `${arr[j]} <= ${arr[j + 1]}，顺序正确，不交换。`
+                });
+
+                if (shouldSwap) {
+                    const temp = arr[j];
+                    arr[j] = arr[j + 1];
+                    arr[j + 1] = temp;
+                    result.push({
+                        array: [...arr],
+                        compare: [j, j + 1],
+                        justSwapped: true,
+                        sortedFrom: arr.length - i,
+                        pass: i + 1,
+                        line: 9,
+                        message: `交换完成：较大的 ${arr[j + 1]} 继续向右冒泡。`
+                    });
+                }
+            }
+
+            result.push({
+                array: [...arr],
+                compare: [arr.length - i - 1],
+                sortedFrom: arr.length - i - 1,
+                pass: i + 1,
+                line: 13,
+                message: `第 ${i + 1} 轮结束，位置 ${arr.length - i - 1} 上的 ${arr[arr.length - i - 1]} 已经确定。`
+            });
+        }
+
+        result.push({
+            array: [...arr],
+            compare: [],
+            sortedFrom: 0,
+            pass: arr.length - 1,
+            line: 15,
+            message: `排序完成：得到 [${arr.join(', ')}]。`
+        });
+
+        return result;
+    }
+
+    function colorForCell(index, state) {
+        if (state.compare.includes(index) && state.swap) return 'bg-red-400 border-red-500 text-white';
+        if (state.compare.includes(index)) return 'bg-amber-300 border-amber-500 text-amber-950';
+        if (index >= state.sortedFrom) return 'bg-emerald-400 border-emerald-500 text-white';
+        return 'bg-slate-100 border-slate-300 text-slate-800';
+    }
+
+    function render() {
+        const state = steps[currentStep];
+        if (!state) return;
+
+        const max = Math.max(...state.array, 1);
+        barContainer.innerHTML = '';
+        arrayContainer.innerHTML = '';
+
+        state.array.forEach((value, index) => {
+            const barWrap = document.createElement('div');
+            barWrap.className = 'flex flex-col items-center gap-2 min-w-[42px]';
+
+            const bar = document.createElement('div');
+            const isCompared = state.compare.includes(index);
+            const isSorted = index >= state.sortedFrom;
+            const height = Math.max(24, Math.round((value / max) * 220));
+            bar.className = [
+                'bar w-10 rounded-t-md',
+                isCompared && state.swap ? 'bg-red-400 lift' : '',
+                isCompared && !state.swap ? 'bg-amber-400 lift' : '',
+                !isCompared && isSorted ? 'bg-emerald-400' : '',
+                !isCompared && !isSorted ? 'bg-blue-500' : ''
+            ].join(' ');
+            bar.style.height = `${height}px`;
+
+            const label = document.createElement('div');
+            label.className = 'text-xs font-semibold text-gray-700';
+            label.textContent = value;
+
+            barWrap.appendChild(bar);
+            barWrap.appendChild(label);
+            barContainer.appendChild(barWrap);
+
+            const cellWrap = document.createElement('div');
+            cellWrap.className = 'flex flex-col items-center gap-2';
+
+            const cell = document.createElement('div');
+            cell.className = `cell w-14 h-14 rounded-lg border-2 flex items-center justify-center font-bold ${colorForCell(index, state)}`;
+            if (state.compare.includes(index)) cell.classList.add('lift');
+            cell.textContent = value;
+
+            const indexLabel = document.createElement('div');
+            indexLabel.className = 'text-xs text-gray-500';
+            indexLabel.textContent = `a[${index}]`;
+
+            cellWrap.appendChild(cell);
+            cellWrap.appendChild(indexLabel);
+            arrayContainer.appendChild(cellWrap);
+        });
+
+        codeLines.forEach(line => {
+            line.classList.toggle('active-line', Number(line.dataset.line) === state.line);
+        });
+
+        explanationText.textContent = state.message;
+        passLabel.textContent = `第 ${state.pass} 轮`;
+        stepCounter.textContent = `进度: ${currentStep + 1} / ${steps.length}`;
+        prevBtn.disabled = currentStep === 0;
+        nextBtn.disabled = currentStep === steps.length - 1;
+        playBtn.textContent = playTimer ? '暂停播放' : '自动播放';
+    }
+
+    function reset() {
+        stopPlay();
+        steps = buildSteps(parseArray());
+        currentStep = 0;
+        render();
+    }
+
+    function stopPlay() {
+        if (playTimer) {
+            clearInterval(playTimer);
+            playTimer = null;
+        }
+    }
+
+    function nextStep() {
+        if (currentStep < steps.length - 1) {
+            currentStep += 1;
+            render();
+        } else {
+            stopPlay();
+            render();
+        }
+    }
+
+    generateBtn.addEventListener('click', reset);
+    prevBtn.addEventListener('click', () => {
+        stopPlay();
+        currentStep = Math.max(0, currentStep - 1);
+        render();
+    });
+    nextBtn.addEventListener('click', () => {
+        stopPlay();
+        nextStep();
+    });
+    playBtn.addEventListener('click', () => {
+        if (playTimer) {
+            stopPlay();
+            render();
+            return;
+        }
+        playTimer = setInterval(nextStep, 1100);
+        render();
+    });
+
+    reset();
+</script>
+</body>
+</html>

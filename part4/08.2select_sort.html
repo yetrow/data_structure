@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>选择排序 (Selection Sort) 动画演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        body { font-family: 'Inter', system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+        
+        .code-line { transition: all 0.2s ease; padding-left: 1rem; border-left: 4px solid transparent; margin: 2px 0; border-radius: 0 4px 4px 0;}
+        .code-line.active { background-color: rgba(59, 130, 246, 0.2); border-left-color: #3b82f6; }
+        
+        .sort-bar { 
+            transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                        height 0.3s ease, 
+                        background-color 0.4s ease; 
+        }
+        
+        .pointer {
+            transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                        opacity 0.3s ease,
+                        bottom 0.3s ease;
+        }
+
+        .highlight-pulse {
+            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- 左侧：代码区 -->
+    <div class="w-full md:w-[40%] bg-[#1e1e1e] flex flex-col border-r border-gray-700 h-1/2 md:h-full z-20 shadow-2xl">
+        <div class="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center shadow-md">
+            <h2 class="text-lg font-bold text-blue-400">选择排序逻辑</h2>
+            <div class="flex gap-2">
+                <span class="px-2 py-1 text-xs rounded bg-blue-900/50 text-blue-300 border border-blue-700/50">i (存放位)</span>
+                <span class="px-2 py-1 text-xs rounded bg-pink-900/50 text-pink-300 border border-pink-700/50">j (扫描位)</span>
+                <span class="px-2 py-1 text-xs rounded bg-red-900/50 text-red-300 border border-red-700/50">min_index</span>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 font-mono text-sm leading-relaxed text-gray-300">
+            <div id="line-0" class="code-line text-blue-300 font-bold">void select_sort(int a[], int n) {</div>
+            <div id="line-1" class="code-line text-yellow-300 font-bold">    for (int i = 0; i < n - 1; i++) {</div>
+            <div id="line-2" class="code-line text-red-300">        int min_index = i;</div>
+            <div id="line-3" class="code-line"> </div>
+            <div id="line-4" class="code-line text-pink-300 font-bold">        for (int j = i + 1; j < n; j++) {</div>
+            <div id="line-5" class="code-line">            if(a[j] < a[min_index]) {</div>
+            <div id="line-6" class="code-line text-red-300">                min_index = j;</div>
+            <div id="line-7" class="code-line">            }</div>
+            <div id="line-8" class="code-line">        }</div>
+            <div id="line-9" class="code-line"> </div>
+            <div id="line-10" class="code-line text-green-300">        int temp = a[i];</div>
+            <div id="line-11" class="code-line text-green-300">        a[i] = a[min_index];</div>
+            <div id="line-12" class="code-line text-green-300">        a[min_index] = temp;</div>
+            <div id="line-13" class="code-line text-yellow-300 font-bold">    }</div>
+            <div id="line-14" class="code-line text-blue-300 font-bold">}</div>
+        </div>
+    </div>
+
+    <!-- 右侧：可视化区 -->
+    <div class="w-full md:w-[60%] flex flex-col h-1/2 md:h-full relative bg-gray-50 text-gray-900">
+        
+        <!-- 解释提示框 -->
+        <div class="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur shadow-xl rounded-xl p-4 border border-gray-200 z-30">
+            <h3 class="font-bold text-lg mb-1 text-gray-800 border-b border-gray-100 pb-2">步骤解析：</h3>
+            <p id="explanation-text" class="text-gray-600 whitespace-pre-line leading-relaxed mt-2 text-sm md:text-base">点击下方控制按钮开始演示。</p>
+        </div>
+
+        <!-- 可视化画布 -->
+        <div class="flex-1 relative overflow-hidden bg-gray-100 flex items-center justify-center" id="canvas-container">
+            <!-- 容器用于居中排列元素 -->
+            <div id="bars-container" class="relative h-[300px] w-[500px]">
+                <!-- DOM Nodes 会通过JS动态插入这里 -->
+            </div>
+
+            <!-- 指针 -->
+            <div id="pointer-i" class="pointer absolute px-3 py-1 bg-blue-100 border-2 border-blue-500 text-blue-700 font-bold rounded-lg shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0 mb-4" style="bottom: 10px;">
+                i
+                <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-blue-500"></div>
+            </div>
+
+            <div id="pointer-j" class="pointer absolute px-3 py-1 bg-pink-100 border-2 border-pink-500 text-pink-700 font-bold rounded-lg shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0 mb-4" style="bottom: 10px;">
+                j
+                <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-pink-500"></div>
+            </div>
+
+            <div id="pointer-min" class="pointer absolute px-3 py-1 bg-red-100 border-2 border-red-500 text-red-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0 mt-4" style="top: 0px;">
+                <div class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-500"></div>
+                min
+            </div>
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="bg-white border-t border-gray-200 p-4 flex justify-center items-center gap-3 md:gap-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-30">
+            <button id="btn-reset" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span class="hidden md:inline">重置</span>
+            </button>
+            <button id="btn-prev" class="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium transition flex items-center gap-1 disabled:opacity-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span class="hidden md:inline">上一步</span>
+            </button>
+            <span class="text-sm font-bold text-gray-500 w-16 text-center" id="step-counter">0 / 0</span>
+            <button id="btn-next" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition shadow-md shadow-blue-500/30 flex items-center gap-1 disabled:opacity-50">
+                下一步
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <button id="btn-auto" class="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                自动播放
+            </button>
+        </div>
+    </div>
+
+<script>
+    // 初始化数组数据 (包含唯一ID用于动画定位)
+    const initialArray = [
+        { id: 'item1', val: 45 },
+        { id: 'item2', val: 12 },
+        { id: 'item3', val: 38 },
+        { id: 'item4', val: 8 },
+        { id: 'item5', val: 24 }
+    ];
+
+    const BAR_WIDTH = 50;
+    const BAR_SPACING = 30; // 间距
+    const START_X = 50;     // 初始偏移量
+
+    let appStates = [];
+    let currentStepIndex = 0;
+    let autoPlayInterval = null;
+
+    /**
+     * 生成状态机
+     * 运行一遍选择排序算法，并把每一步的状态“拍照”存进数组里。
+     */
+    function generateStates() {
+        const states = [];
+        let arr = initialArray.map(obj => ({ ...obj })); // 深拷贝
+        const n = arr.length;
+        
+        // 辅助函数：拷贝当前数组状态
+        const copyArr = (a) => a.map(obj => ({ ...obj }));
+
+        states.push({
+            lineId: 'line-0',
+            msg: "【初始状态】\n准备对数组进行选择排序。选择排序的核心逻辑是：每次在剩余的无序区中找到最小值，把它换到无序区的最前面。",
+            arr: copyArr(arr),
+            vars: { i: null, j: null, min_index: null },
+            sortedUntil: -1 // 已排好序的边界 (-1代表没有)
+        });
+
+        for (let i = 0; i < n - 1; i++) {
+            states.push({
+                lineId: 'line-1',
+                msg: `进入外层循环：<span class="text-blue-600 font-bold">i = ${i}</span>\n当前我们要确定第 ${i} 个位置（也就是剩下元素的最小存放位）。\n前面 [0, ${i-1}] 已经是排好序的安全区了。`,
+                arr: copyArr(arr),
+                vars: { i: i, j: null, min_index: null },
+                sortedUntil: i - 1
+            });
+
+            let min_index = i;
+            states.push({
+                lineId: 'line-2',
+                msg: `【假设最小值】\n首先，我们假设当前无序区的第一个元素 a[${i}] (即 <b>${arr[i].val}</b>) 就是最小值。\n令 <span class="text-red-600 font-bold">min_index = ${i}</span>。`,
+                arr: copyArr(arr),
+                vars: { i: i, j: null, min_index: min_index },
+                sortedUntil: i - 1
+            });
+
+            for (let j = i + 1; j < n; j++) {
+                states.push({
+                    lineId: 'line-4',
+                    msg: `进入内层循环：<span class="text-pink-600 font-bold">j = ${j}</span>\n拿当前元素 a[j] (<b>${arr[j].val}</b>) 和我们目前认为的最小值 a[min_index] (<b>${arr[min_index].val}</b>) 进行比较。`,
+                    arr: copyArr(arr),
+                    vars: { i: i, j: j, min_index: min_index },
+                    sortedUntil: i - 1
+                });
+
+                states.push({
+                    lineId: 'line-5',
+                    msg: `执行比较： a[${j}] < a[${min_index}] ?\n即 ${arr[j].val} < ${arr[min_index].val} 是否成立？`,
+                    arr: copyArr(arr),
+                    vars: { i: i, j: j, min_index: min_index },
+                    sortedUntil: i - 1
+                });
+
+                if (arr[j].val < arr[min_index].val) {
+                    min_index = j;
+                    states.push({
+                        lineId: 'line-6',
+                        msg: `<b>成立！</b> 发现更小的值 ${arr[j].val}。\n更新最小值记录，令 <span class="text-red-600 font-bold">min_index = ${j}</span>。`,
+                        arr: copyArr(arr),
+                        vars: { i: i, j: j, min_index: min_index },
+                        sortedUntil: i - 1
+                    });
+                }
+            }
+
+            states.push({
+                lineId: 'line-10',
+                msg: `内层 j 循环结束。\n现在我们找到了无序区中真正的最小值：a[${min_index}] (<b>${arr[min_index].val}</b>)。\n接下来我们要把它放到这一轮应该呆的位置 i (${i}) 上。`,
+                arr: copyArr(arr),
+                vars: { i: i, j: null, min_index: min_index },
+                sortedUntil: i - 1
+            });
+
+            // 如果最小值就是i本身，虽然也执行交换代码，但物理没动
+            if (i !== min_index) {
+                let temp = arr[i];
+                arr[i] = arr[min_index];
+                arr[min_index] = temp;
+                
+                states.push({
+                    lineId: 'line-11',
+                    msg: `【执行交换 Swap】\n将 a[i] (原值为 ${arr[min_index].val}) 与 a[min_index] (原值为 ${temp.val}) 交换位置。\n(观察右侧条形图的移动)`,
+                    arr: copyArr(arr),
+                    vars: { i: i, j: null, min_index: i }, // 交换后，min_index指回前面去了
+                    sortedUntil: i // 这个元素正式进入已排序区
+                });
+            } else {
+                states.push({
+                    lineId: 'line-11',
+                    msg: `【无需实际移动】\n因为最小值刚好就在它应该在的位置 (i == min_index)，所以自己和自己交换，位置不变。`,
+                    arr: copyArr(arr),
+                    vars: { i: i, j: null, min_index: i },
+                    sortedUntil: i
+                });
+            }
+        }
+
+        states.push({
+            lineId: 'line-14',
+            msg: "🎉【排序完成】\n外层循环结束。整个数组都已经成为了有序区！",
+            arr: copyArr(arr),
+            vars: { i: null, j: null, min_index: null },
+            sortedUntil: n - 1 // 全部排序完成
+        });
+
+        return states;
+    }
+
+    function initDOM() {
+        const container = document.getElementById('bars-container');
+        container.innerHTML = '';
+        
+        const maxVal = Math.max(...initialArray.map(item => item.val));
+        
+        initialArray.forEach((item, index) => {
+            // 计算高度占比
+            const heightPx = Math.max((item.val / maxVal) * 200, 30); 
+            
+            const html = `
+                <div id="${item.id}" class="sort-bar absolute bottom-0 w-[50px] bg-slate-300 rounded-t-md border-2 border-slate-400 flex items-end justify-center pb-2 font-bold text-slate-800 shadow-md" style="height: ${heightPx}px; left: ${START_X + index * (BAR_WIDTH + BAR_SPACING)}px;">
+                    ${item.val}
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    function renderStep(index) {
+        const state = appStates[index];
+        if (!state) return;
+
+        // 1. 更新解释框文字
+        const expEl = document.getElementById('explanation-text');
+        expEl.innerHTML = state.msg;
+
+        // 2. 更新代码高亮
+        document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+        if (state.lineId) {
+            const activeLine = document.getElementById(state.lineId);
+            if (activeLine) {
+                activeLine.classList.add('active');
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 3. 更新条形图的位置和颜色
+        state.arr.forEach((item, arrIndex) => {
+            const el = document.getElementById(item.id);
+            if (!el) return;
+            
+            // 计算新坐标进行动画移动
+            const newLeft = START_X + arrIndex * (BAR_WIDTH + BAR_SPACING);
+            el.style.left = `${newLeft}px`;
+
+            // 颜色逻辑
+            el.classList.remove('bg-emerald-400', 'border-emerald-500', 'bg-slate-300', 'border-slate-400', 'bg-blue-300', 'border-blue-500', 'bg-red-400', 'border-red-600', 'bg-pink-300', 'border-pink-500', 'highlight-pulse', 'z-20', 'z-10');
+            el.classList.add('z-10'); // 默认层级
+
+            if (arrIndex <= state.sortedUntil) {
+                // 已排序的安全区
+                el.classList.add('bg-emerald-400', 'border-emerald-500');
+            } else {
+                // 默认无序区
+                el.classList.add('bg-slate-300', 'border-slate-400');
+            }
+
+            // 针对当前活跃指针上色 (覆盖优先级)
+            if (arrIndex === state.vars.i && index !== appStates.length - 1) {
+                el.classList.remove('bg-slate-300', 'border-slate-400');
+                el.classList.add('bg-blue-300', 'border-blue-500');
+            }
+            if (arrIndex === state.vars.j) {
+                el.classList.remove('bg-slate-300', 'border-slate-400');
+                el.classList.add('bg-pink-300', 'border-pink-500');
+            }
+            if (arrIndex === state.vars.min_index && index !== appStates.length - 1) {
+                // 最小值有最高展示优先级，加入呼吸灯特效
+                el.className = el.className.replace(/bg-\w+-300/g, ''); 
+                el.className = el.className.replace(/bg-slate-300/g, ''); 
+                el.classList.add('bg-red-400', 'border-red-600', 'highlight-pulse', 'z-20');
+            }
+        });
+
+        // 4. 更新下/上方悬浮指针位置
+        const updatePointer = (ptrId, valIndex) => {
+            const ptrEl = document.getElementById(`pointer-${ptrId}`);
+            if (valIndex !== null) {
+                const targetLeft = START_X + valIndex * (BAR_WIDTH + BAR_SPACING) + (BAR_WIDTH / 2);
+                // 使用容器宽度计算绝对 left
+                ptrEl.style.left = `calc(50% - 250px + ${targetLeft}px)`; // 250 是容器 500 的一半
+                ptrEl.style.opacity = '1';
+            } else {
+                ptrEl.style.opacity = '0';
+            }
+        };
+
+        updatePointer('i', state.vars.i);
+        updatePointer('j', state.vars.j);
+        updatePointer('min', state.vars.min_index);
+
+        // 为了避免 i 和 j 指针重叠在同一位置，给它们添加错层
+        const elI = document.getElementById('pointer-i');
+        const elJ = document.getElementById('pointer-j');
+        if (state.vars.i === state.vars.j && state.vars.i !== null) {
+            elJ.style.bottom = '-30px'; // 往下挪一点
+        } else {
+            elJ.style.bottom = '10px';
+        }
+
+        // 5. 更新控制面板
+        document.getElementById('step-counter').innerText = `${index} / ${appStates.length - 1}`;
+        document.getElementById('btn-prev').disabled = index === 0;
+        document.getElementById('btn-next').disabled = index === appStates.length - 1;
+    }
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+        if (currentStepIndex < appStates.length - 1) {
+            currentStepIndex++;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        stopAutoPlay();
+        currentStepIndex = 0;
+        initDOM(); // 必须重置物理DOM顺序，否则CSS动画回滚会乱
+        // 小延迟确保DOM刷新
+        setTimeout(() => renderStep(currentStepIndex), 50);
+    });
+
+    const btnAuto = document.getElementById('btn-auto');
+    function toggleAutoPlay() {
+        if (autoPlayInterval) {
+            stopAutoPlay();
+        } else {
+            btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg> 暂停`;
+            btnAuto.classList.replace('bg-purple-100', 'bg-red-100');
+            btnAuto.classList.replace('text-purple-700', 'text-red-700');
+            autoPlayInterval = setInterval(() => {
+                if (currentStepIndex < appStates.length - 1) {
+                    currentStepIndex++;
+                    renderStep(currentStepIndex);
+                } else {
+                    stopAutoPlay();
+                }
+            }, 1500); // 每步1.5秒
+        }
+    }
+
+    function stopAutoPlay() {
+        if(autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+        btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 自动播放`;
+        btnAuto.classList.replace('bg-red-100', 'bg-purple-100');
+        btnAuto.classList.replace('text-red-700', 'text-purple-700');
+    }
+
+    btnAuto.addEventListener('click', toggleAutoPlay);
+
+    window.onload = () => {
+        appStates = generateStates();
+        initDOM();
+        setTimeout(() => {
+            renderStep(0);
+        }, 100);
+    };
+</script>
+</body>
+</html>

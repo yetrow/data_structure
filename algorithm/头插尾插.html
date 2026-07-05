@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单链表奇偶拆分 (尾插+头插) 动画演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        
+        .code-line { transition: all 0.2s ease; padding-left: 1rem; border-left: 4px solid transparent; margin: 2px 0; border-radius: 0 4px 4px 0;}
+        .code-line.active { background-color: rgba(59, 130, 246, 0.2); border-left-color: #3b82f6; }
+        
+        /* 节点的移动过渡动画 */
+        .list-node { transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        /* 指针的平滑移动 */
+        .pointer-label { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* 避免选中文字影响体验 */
+        .no-select { user-select: none; -webkit-user-select: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden no-select">
+
+    <!-- 左侧：代码区 -->
+    <div class="w-full md:w-[40%] bg-[#1e1e1e] flex flex-col border-r border-gray-700 h-1/2 md:h-full z-20 shadow-2xl">
+        <div class="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center shadow-md">
+            <h2 class="text-lg font-bold text-blue-400">代码执行逻辑</h2>
+            <div class="flex gap-2">
+                <span class="px-2 py-1 text-xs rounded bg-pink-900/50 text-pink-300 border border-pink-700/50">p</span>
+                <span class="px-2 py-1 text-xs rounded bg-amber-900/50 text-amber-300 border border-amber-700/50">tailA</span>
+                <span class="px-2 py-1 text-xs rounded bg-cyan-900/50 text-cyan-300 border border-cyan-700/50">tmp</span>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 font-mono text-sm leading-relaxed text-gray-300">
+            <div id="line-0" class="code-line text-blue-300 font-bold">void Split(LinkList C, LinkList &A, LinkList &B) {</div>
+            <div id="line-1" class="code-line">    LNode *p = C->next;</div>
+            <div id="line-2" class="code-line">    LNode *tailA;</div>
+            <div id="line-3" class="code-line">    LNode *tmp;</div>
+            <div id="line-4" class="code-line">    </div>
+            <div id="line-5" class="code-line">    A = (LNode *)malloc(sizeof(LNode));</div>
+            <div id="line-6" class="code-line">    B = (LNode *)malloc(sizeof(LNode));</div>
+            <div id="line-7" class="code-line">    A->next = NULL;</div>
+            <div id="line-8" class="code-line">    B->next = NULL;</div>
+            <div id="line-9" class="code-line">    </div>
+            <div id="line-10" class="code-line">    tailA = A; <span class="text-gray-500">// tailA从A的头结点开始</span></div>
+            <div id="line-11" class="code-line">    </div>
+            <div id="line-12" class="code-line text-yellow-300 font-bold">    while (p != NULL) {</div>
+            <div id="line-13" class="code-line text-gray-400">        // ==== 第一步：拆a节点，尾插到A ====</div>
+            <div id="line-14" class="code-line">        tmp = p;</div>
+            <div id="line-15" class="code-line">        p = p->next;</div>
+            <div id="line-16" class="code-line">        </div>
+            <div id="line-17" class="code-line text-orange-300">        tailA->next = tmp; <span class="text-gray-500">// 尾插</span></div>
+            <div id="line-18" class="code-line text-orange-300">        tailA = tmp;</div>
+            <div id="line-19" class="code-line text-orange-300">        tailA->next = NULL;</div>
+            <div id="line-20" class="code-line">        </div>
+            <div id="line-21" class="code-line text-gray-400">        // ==== 第二步：拆b节点，头插到B ====</div>
+            <div id="line-22" class="code-line text-green-300">        if (p != NULL) {</div>
+            <div id="line-23" class="code-line">            tmp = p;</div>
+            <div id="line-24" class="code-line">            p = p->next;</div>
+            <div id="line-25" class="code-line">            </div>
+            <div id="line-26" class="code-line text-purple-300">            tmp->next = B->next; <span class="text-gray-500">// 头插</span></div>
+            <div id="line-27" class="code-line text-purple-300">            B->next = tmp;</div>
+            <div id="line-28" class="code-line">        }</div>
+            <div id="line-29" class="code-line">    }</div>
+            <div id="line-30" class="code-line text-blue-300 font-bold">}</div>
+        </div>
+    </div>
+
+    <!-- 右侧：可视化区 -->
+    <div class="w-full md:w-[60%] flex flex-col h-1/2 md:h-full relative bg-gray-50 text-gray-900">
+        
+        <!-- 解释提示框 -->
+        <div class="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur shadow-xl rounded-xl p-4 border border-gray-200 z-30">
+            <h3 class="font-bold text-lg mb-1 text-gray-800 border-b border-gray-100 pb-2">步骤解析：</h3>
+            <p id="explanation-text" class="text-gray-600 whitespace-pre-line leading-relaxed mt-2 text-sm md:text-base">点击下方控制按钮开始演示。</p>
+        </div>
+
+        <!-- 可视化画布 -->
+        <div class="flex-1 relative overflow-auto min-w-full bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]" id="canvas-container">
+            <div class="absolute inset-0 min-w-[1000px] min-h-[600px] mt-24">
+                <!-- SVG箭头层 -->
+                <svg id="arrows-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+                
+                <!-- DOM节点层 (由JS动态填充) -->
+                <div id="nodes-layer" class="absolute inset-0 z-20 pointer-events-none"></div>
+
+                <!-- 指针标签层 -->
+                <div id="pointer-p" class="pointer-label absolute px-3 py-1 bg-pink-100 border-2 border-pink-500 text-pink-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0">
+                    p
+                    <div class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-pink-500"></div>
+                </div>
+                
+                <div id="pointer-tailA" class="pointer-label absolute px-3 py-1 bg-amber-100 border-2 border-amber-500 text-amber-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0">
+                    <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-amber-500"></div>
+                    tailA
+                </div>
+
+                <div id="pointer-tmp" class="pointer-label absolute px-3 py-1 bg-cyan-100 border-2 border-cyan-500 text-cyan-700 font-bold rounded-full shadow-md z-30 flex flex-col items-center justify-center transform -translate-x-1/2 opacity-0">
+                    <div class="absolute -top-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-cyan-500"></div>
+                    tmp
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="bg-white border-t border-gray-200 p-4 flex justify-center items-center gap-3 md:gap-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-30">
+            <button id="btn-reset" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span class="hidden md:inline">重置</span>
+            </button>
+            <button id="btn-prev" class="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium transition flex items-center gap-1 disabled:opacity-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span class="hidden md:inline">上一步</span>
+            </button>
+            <span class="text-sm font-bold text-gray-500 w-16 text-center" id="step-counter">0 / 0</span>
+            <button id="btn-next" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition shadow-md shadow-blue-500/30 flex items-center gap-1 disabled:opacity-50">
+                下一步
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <button id="btn-auto" class="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                自动播放
+            </button>
+        </div>
+    </div>
+
+<script>
+    // 布局常量配置
+    const COL_START = 80;    // 首列X坐标
+    const COL_SPACE = 140;   // 列间距
+    const ROW_C = 60;        // 原链表C所在的Y坐标
+    const ROW_A = 220;       // A链表所在的Y坐标
+    const ROW_B = 380;       // B链表所在的Y坐标
+
+    // 节点基础定义
+    const nodeDefs = [
+        { id: 'HeadC', label: 'Head C', theme: 'gray' },
+        { id: 'N1', label: 'a1', sub: '1', theme: 'orange' },
+        { id: 'N2', label: 'b1', sub: '2', theme: 'purple' },
+        { id: 'N3', label: 'a2', sub: '3', theme: 'orange' },
+        { id: 'N4', label: 'b2', sub: '4', theme: 'purple' },
+        { id: 'N5', label: 'a3', sub: '5', theme: 'orange' },
+        { id: 'HeadA', label: 'Head A', theme: 'orange' },
+        { id: 'HeadB', label: 'Head B', theme: 'purple' }
+    ];
+
+    // 全局当前状态，用于 requestAnimationFrame 画线
+    let currentNextMap = {};
+    let isDrawingLoopActive = false;
+
+    /**
+     * 生成状态机
+     * 为了保证逻辑严丝合缝，这里通过纯JS逻辑模拟执行步骤，生成详细的状态数组。
+     */
+    function generateStates() {
+        const states = [];
+        
+        // 辅助函数：深度克隆当前位置和连接状态
+        const clone = (obj) => JSON.parse(JSON.stringify(obj));
+        
+        // 初始物理位置 (r: 行号, c: 列号)
+        let pos = {
+            HeadC: {r: ROW_C, c: 0, visible: true},
+            N1: {r: ROW_C, c: 1, visible: true},
+            N2: {r: ROW_C, c: 2, visible: true},
+            N3: {r: ROW_C, c: 3, visible: true},
+            N4: {r: ROW_C, c: 4, visible: true},
+            N5: {r: ROW_C, c: 5, visible: true},
+            HeadA: {r: ROW_A, c: 0, visible: false},
+            HeadB: {r: ROW_B, c: 0, visible: false}
+        };
+
+        // 初始逻辑连接
+        let nexts = { HeadC: 'N1', N1: 'N2', N2: 'N3', N3: 'N4', N4: 'N5', N5: null, HeadA: null, HeadB: null };
+        
+        // 初始指针
+        let ptrs = { p: null, tailA: null, tmp: null };
+
+        // 用于追踪A、B当前摆放了几个节点，用于计算列号
+        let aCount = 0;
+        let bCount = 0;
+
+        // 推入初始状态
+        states.push({
+            lineId: 'line-0',
+            msg: "【初始状态】\n链表 C 包含元素：a1(1), b1(2), a2(3), b2(4), a3(5)。\n我们将把奇数项(a)放入A表，偶数项(b)放入B表。",
+            pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs)
+        });
+
+        // line-1: LNode *p = C->next;
+        ptrs.p = 'N1';
+        states.push({ lineId: 'line-1', msg: "定义遍历指针 p，指向原链表 C 的第一个数据结点。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+        // line-5 to 8: Malloc Head A and B
+        pos.HeadA.visible = true; pos.HeadB.visible = true;
+        states.push({ lineId: 'line-7', msg: "为新链表 A 和 B 初始化头结点，并将它们的 next 暂时置为 NULL。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+        // line-10: tailA = A;
+        ptrs.tailA = 'HeadA';
+        states.push({ lineId: 'line-10', msg: "初始化 tailA 指针。\ntailA 的作用是：始终指向 A 链表的最后一个结点，方便后续进行【尾插】。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+        // 模拟节点数据：1(N1), 2(N2), 3(N3), 4(N4), 5(N5)
+        const nodesList = ['N1', 'N2', 'N3', 'N4', 'N5'];
+        let pIndex = 0;
+
+        // 核心循环
+        while (pIndex < nodesList.length) {
+            let currentNode = nodesList[pIndex];
+            
+            states.push({ lineId: 'line-12', msg: `进入 while 循环，当前 p 指向 ${currentNode}，不为空。`, pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            // ==== 第一步：处理 a 节点 (尾插到 A) ====
+            ptrs.tmp = currentNode;
+            states.push({ lineId: 'line-14', msg: `【拆 a 结点】用 tmp 临时指向当前要处理的结点 ${currentNode}。`, pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            pIndex++;
+            ptrs.p = pIndex < nodesList.length ? nodesList[pIndex] : null;
+            states.push({ lineId: 'line-15', msg: "将 p 往后移，指向下一个要处理的结点。这样 tmp 就可以安心地从原链表上拆下来了。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            // 尾插到 A
+            nexts[ptrs.tailA] = ptrs.tmp;
+            aCount++;
+            pos[ptrs.tmp].r = ROW_A; 
+            pos[ptrs.tmp].c = aCount; // 放到 A 链表的末尾列
+            states.push({ lineId: 'line-17', msg: "【尾插操作 1】将 tailA 的 next 指向 tmp。\n(你可以看到节点被移动到了 A 链表的末尾)", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            ptrs.tailA = ptrs.tmp;
+            states.push({ lineId: 'line-18', msg: "【尾插操作 2】更新 tailA，让它重新指向 A 链表的最新尾部结点。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            nexts[ptrs.tailA] = null;
+            states.push({ lineId: 'line-19', msg: "【尾插操作 3】将新尾结点的 next 置空，防止新链表出现成环现象（防断链的扫尾工作）。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+            // ==== 第二步：处理 b 节点 (头插到 B) ====
+            states.push({ lineId: 'line-22', msg: "判断 p 是否为空。因为单链表长度可能是奇数，处理完 a 后，不一定还有 b。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+            
+            if (pIndex < nodesList.length) {
+                currentNode = nodesList[pIndex];
+                
+                ptrs.tmp = currentNode;
+                states.push({ lineId: 'line-23', msg: `【拆 b 结点】p 不为空，用 tmp 临时指向当前的 b 结点 ${currentNode}。`, pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+                pIndex++;
+                ptrs.p = pIndex < nodesList.length ? nodesList[pIndex] : null;
+                states.push({ lineId: 'line-24', msg: "将 p 继续后移，准备下一轮循环使用。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+                // 头插到 B
+                nexts[ptrs.tmp] = nexts.HeadB;
+                
+                // 可视化处理：头插意味着 B 链表中现有的所有节点都要向右挤一格
+                bCount++;
+                for (const key in pos) {
+                    if (pos[key].r === ROW_B && key !== 'HeadB' && pos[key].c > 0) {
+                        pos[key].c += 1;
+                    }
+                }
+                pos[ptrs.tmp].r = ROW_B;
+                pos[ptrs.tmp].c = 1; // 永远插在第一列
+                
+                states.push({ lineId: 'line-26', msg: `【头插操作 1】将 tmp 的 next 指向 B 链表目前的第一个元素 (B->next)。\n当前 B->next 是 ${nexts.HeadB === null ? 'NULL' : nexts.HeadB}。`, pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+                nexts.HeadB = ptrs.tmp;
+                states.push({ lineId: 'line-27', msg: `【头插操作 2】将 HeadB 指向 tmp。\n观察动画：${currentNode} 挤到了最前面，这就是头插法实现**逆置**的视觉表现！`, pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+            }
+        }
+
+        states.push({ lineId: 'line-12', msg: "此时 p == NULL，退出 while 循环。\n奇偶拆分完成！\nA链表（尾插）保持原序：1 -> 3 -> 5。\nB链表（头插）逆序：4 -> 2。", pos: clone(pos), nexts: clone(nexts), ptrs: clone(ptrs) });
+
+        return states;
+    }
+
+    const appStates = generateStates();
+    let currentStepIndex = 0;
+    let autoPlayInterval = null;
+
+    function initNodesDOM() {
+        const layer = document.getElementById('nodes-layer');
+        layer.innerHTML = '';
+        
+        nodeDefs.forEach(def => {
+            const isHead = def.id.startsWith('Head');
+            
+            // 颜色主题
+            let colors = '';
+            if (def.theme === 'gray') colors = 'bg-gray-100 border-gray-400 text-gray-700';
+            else if (def.theme === 'orange') colors = 'bg-orange-50 border-orange-400 text-orange-800';
+            else if (def.theme === 'purple') colors = 'bg-purple-50 border-purple-400 text-purple-800';
+
+            const html = `
+                <div id="node-${def.id}" class="list-node absolute w-[100px] h-[44px] border-2 rounded-md flex overflow-hidden shadow-md opacity-0 ${colors}" style="left:0; top:0;">
+                    <div class="w-[65%] border-r-2 ${def.theme === 'gray' ? 'border-gray-400' : (def.theme==='orange' ? 'border-orange-400' : 'border-purple-400')} flex flex-col items-center justify-center font-bold font-mono">
+                        <span class="text-[15px]">${def.label}</span>
+                        ${def.sub ? `<span class="text-[10px] text-gray-500 -mt-1 tracking-widest">${def.sub}</span>` : ''}
+                    </div>
+                    <div class="w-[35%] flex items-center justify-center bg-white/50 backdrop-blur-sm pointer-port">
+                        <div class="w-2.5 h-2.5 rounded-full ${def.theme === 'gray' ? 'bg-gray-500' : (def.theme==='orange' ? 'bg-orange-500' : 'bg-purple-500')} shadow-inner"></div>
+                    </div>
+                </div>
+            `;
+            layer.innerHTML += html;
+        });
+    }
+
+    // 根据行列计算绝对像素坐标
+    function getPixelCoords(r, c) {
+        return { x: COL_START + c * COL_SPACE, y: r };
+    }
+
+    function renderStep(index) {
+        const state = appStates[index];
+        if (!state) return;
+
+        // 1. 更新解释框
+        const expEl = document.getElementById('explanation-text');
+        expEl.innerHTML = state.msg.replace(/p\(/g, '<span class="text-pink-600 font-bold">p</span>(')
+                                   .replace(/tmp/g, '<span class="text-cyan-600 font-bold">tmp</span>')
+                                   .replace(/tailA/g, '<span class="text-amber-600 font-bold">tailA</span>');
+
+        // 2. 更新代码高亮
+        document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+        if (state.lineId) {
+            const activeLine = document.getElementById(state.lineId);
+            if (activeLine) {
+                activeLine.classList.add('active');
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 3. 更新节点物理位置和可见性
+        for (const [id, pos] of Object.entries(state.pos)) {
+            const el = document.getElementById(`node-${id}`);
+            if (!el) continue;
+            
+            if (pos.visible) {
+                const px = getPixelCoords(pos.r, pos.c);
+                el.style.left = `${px.x}px`;
+                el.style.top = `${px.y}px`;
+                el.style.opacity = '1';
+                el.style.transform = 'scale(1)';
+            } else {
+                el.style.opacity = '0';
+                el.style.transform = 'scale(0.8)';
+            }
+        }
+
+        // 4. 更新指针标签
+        const updatePointer = (ptrId, targetNodeId, yOffset, xOffset) => {
+            const labelEl = document.getElementById(`pointer-${ptrId}`);
+            if (targetNodeId && state.pos[targetNodeId].visible) {
+                const targetPos = state.pos[targetNodeId];
+                const px = getPixelCoords(targetPos.r, targetPos.c);
+                
+                labelEl.style.left = `${px.x + xOffset}px`;
+                labelEl.style.top = `${px.y + yOffset}px`;
+                labelEl.style.opacity = '1';
+                labelEl.style.transform = 'translate(-50%, 0) scale(1)';
+            } else {
+                labelEl.style.opacity = '0';
+                labelEl.style.transform = 'translate(-50%, 20px) scale(0.8)';
+            }
+        };
+
+        // p 在上方，tailA 在左下方，tmp 在右下方避免遮挡
+        updatePointer('p', state.ptrs.p, -40, 50);
+        updatePointer('tailA', state.ptrs.tailA, 55, 30);
+        updatePointer('tmp', state.ptrs.tmp, 55, 70);
+
+        // 5. 更新用于画线的全局 nextMap
+        currentNextMap = state.nexts;
+
+        // 6. 更新控制面板
+        document.getElementById('step-counter').innerText = `${index} / ${appStates.length - 1}`;
+        document.getElementById('btn-prev').disabled = index === 0;
+        document.getElementById('btn-next').disabled = index === appStates.length - 1;
+    }
+
+    /**
+     * 持续渲染 SVG 连线。
+     * 巧妙之处：利用 requestAnimationFrame 持续读取 DOM 元素的 offsetLeft/Top，
+     * 这样连线就能完美且平滑地跟从带有 CSS Transition 动画的节点移动！
+     */
+    function renderArrowsLoop() {
+        const svg = document.getElementById('arrows-svg');
+        let svgContent = `
+            <defs>
+                <marker id="arrowGray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af" />
+                </marker>
+                <marker id="arrowOrange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c" />
+                </marker>
+                <marker id="arrowPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#c084fc" />
+                </marker>
+                <marker id="arrowNull" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#d1d5db" />
+                </marker>
+            </defs>
+        `;
+
+        for (const [fromId, toId] of Object.entries(currentNextMap)) {
+            const fromEl = document.getElementById(`node-${fromId}`);
+            if (!fromEl || parseFloat(fromEl.style.opacity) < 0.5) continue;
+
+            const startX = fromEl.offsetLeft + 82; // 节点右侧端口中心
+            const startY = fromEl.offsetTop + 22;
+
+            // 决定连线颜色 (根据所属逻辑链)
+            let color = "#9ca3af"; let marker = "url(#arrowGray)";
+            if (fromId.includes('A') || (toId && toId.includes('a'))) { color = "#fb923c"; marker = "url(#arrowOrange)"; }
+            if (fromId.includes('B') || (toId && toId.includes('b'))) { color = "#c084fc"; marker = "url(#arrowPurple)"; }
+
+            if (toId === null) {
+                // 指向 NULL 的短折线
+                svgContent += `
+                    <path d="M ${startX} ${startY} L ${startX + 30} ${startY} L ${startX + 30} ${startY + 20}" stroke="#d1d5db" stroke-width="2.5" fill="none" marker-end="url(#arrowNull)" />
+                    <text x="${startX + 30}" y="${startY + 35}" fill="#9ca3af" font-size="12" font-family="monospace" text-anchor="middle">NULL</text>
+                `;
+            } else {
+                const toEl = document.getElementById(`node-${toId}`);
+                if (!toEl) continue;
+
+                const endX = toEl.offsetLeft - 3; // 留出箭头空间
+                const endY = toEl.offsetTop + 22;
+
+                const dx = endX - startX;
+                const dy = endY - startY;
+
+                let pathD = "";
+                
+                if (Math.abs(dy) < 10) {
+                    // 同一行
+                    if (dx > 120) {
+                        // 跨越节点：向上画拱形曲线
+                        const midX = (startX + endX) / 2;
+                        pathD = `M ${startX} ${startY} Q ${midX} ${startY - 45} ${endX} ${endY}`;
+                    } else if (dx < 0) {
+                        // 向左指 (逆置时的反向指) : 向下画拱形曲线
+                        const midX = (startX + endX) / 2;
+                        const depth = Math.min(100, Math.abs(dx) * 0.4);
+                        pathD = `M ${startX} ${startY} Q ${midX} ${startY + depth} ${endX} ${endY}`;
+                        
+                        // 修正：向左指时，为了避免混乱，使用紫色（因为肯定是头插产生的）
+                        color = "#c084fc"; marker = "url(#arrowPurple)";
+                    } else {
+                        // 相邻向右：直线
+                        pathD = `M ${startX} ${startY} L ${endX} ${endY}`;
+                    }
+                } else {
+                    // 不同行：画平滑的 S 型贝塞尔曲线
+                    pathD = `M ${startX} ${startY} C ${startX + 40} ${startY}, ${endX - 40} ${endY}, ${endX} ${endY}`;
+                }
+
+                svgContent += `
+                    <path d="${pathD}" stroke="${color}" stroke-width="2.5" fill="none" marker-end="${marker}" stroke-linecap="round" />
+                `;
+            }
+        }
+        
+        svg.innerHTML = svgContent;
+        
+        if (isDrawingLoopActive) {
+            requestAnimationFrame(renderArrowsLoop);
+        }
+    }
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+        if (currentStepIndex < appStates.length - 1) {
+            currentStepIndex++;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            renderStep(currentStepIndex);
+        }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        stopAutoPlay();
+        currentStepIndex = 0;
+        renderStep(currentStepIndex);
+    });
+
+    const btnAuto = document.getElementById('btn-auto');
+    function toggleAutoPlay() {
+        if (autoPlayInterval) {
+            stopAutoPlay();
+        } else {
+            btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg> 暂停`;
+            btnAuto.classList.replace('bg-purple-100', 'bg-red-100');
+            btnAuto.classList.replace('text-purple-700', 'text-red-700');
+            autoPlayInterval = setInterval(() => {
+                if (currentStepIndex < appStates.length - 1) {
+                    currentStepIndex++;
+                    renderStep(currentStepIndex);
+                } else {
+                    stopAutoPlay();
+                }
+            }, 1800); // 1.8秒一步，留出足够的时间看过渡动画
+        }
+    }
+
+    function stopAutoPlay() {
+        if(autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+        btnAuto.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 自动播放`;
+        btnAuto.classList.replace('bg-red-100', 'bg-purple-100');
+        btnAuto.classList.replace('text-red-700', 'text-purple-700');
+    }
+
+    btnAuto.addEventListener('click', toggleAutoPlay);
+
+    // 初始化
+    window.onload = () => {
+        initNodesDOM();
+        
+        // 启动高频渲染循环，让连线黏住移动的节点
+        isDrawingLoopActive = true;
+        requestAnimationFrame(renderArrowsLoop);
+        
+        // 渲染第一帧
+        setTimeout(() => {
+            renderStep(0);
+        }, 100);
+    };
+</script>
+</body>
+</html>

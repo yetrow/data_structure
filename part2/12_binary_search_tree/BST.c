@@ -135,12 +135,15 @@ static Node* _remove_recursive(BST* bst, Node* node, const void* key)
 
         Node* successor = _find_min_recursive(node->right);
         memcpy(node->data, successor->data, bst->element_size);
+        // 迭代器习惯：在实现迭代器（如 next() 操作）时，找“下一个更大的数”比找“上一个更小的数”稍微更符合直觉。
+        //统一性：保持代码风格统一，全用后继节点，或者全用前驱节点。只要不动摇，BST 依然平衡，中序遍历依然有序。
         node->right = _remove_recursive(bst, node->right, successor->data);
     }
 
     return node; 
 }
 
+// 私有辅助函数：
 static void _traverse_recursive(const Node* node, VisitFunc visit, TraverseOrder order)
 {
     if(node == NULL)    return ;
@@ -152,13 +155,18 @@ static void _traverse_recursive(const Node* node, VisitFunc visit, TraverseOrder
     if(order == POST_ORDER)  visit(node->data);
 }
 
+
+
 // --- Public Api Implementations ---
 
 BST* bst_create(size_t element_size, CompareFunc compare_func)
 {
     if(element_size == 0 || !compare_func)  return NULL;
+
     BST* bst = (BST*)malloc(sizeof(BST));
+
     if(!bst)    return NULL;
+
     bst->root = NULL;
     bst->element_size = element_size;
     bst->size = 0;
@@ -182,7 +190,7 @@ bool bst_insert(BST* bst, const void* element_data)
     if(!bst || !element_data)   return false;
     size_t old_size = bst->size;
     bst->root = _insert_recursive(bst, bst->root, element_data);
-    // 如果size增大了，说明删除成功
+    // 如果size增大了，说明插入成功
     return bst->size > old_size;
 }
 
@@ -191,7 +199,6 @@ bool bst_remove(BST* bst, const void* key)
     if(!bst || !key)    return false;
     
     size_t old_size = bst->size;
-
     bst->root = _remove_recursive(bst, bst->root, key);
 
     // 如果size减小了，说明删除成功
