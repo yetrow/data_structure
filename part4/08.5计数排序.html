@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>计数排序 (Counting Sort) - 408 考研级图解</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        .cell-transition { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        /* 数组单元格样式 */
+        .cell-default { background-color: #ffffff; border-color: #cbd5e1; color: #334155; }
+        .cell-active { background-color: #fef08a; border-color: #eab308; color: #854d0e; transform: scale(1.1); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 10;}
+        .cell-secondary { background-color: #bfdbfe; border-color: #3b82f6; color: #1e3a8a; transform: scale(1.05); }
+        .cell-final { background-color: #dcfce7; border-color: #22c55e; color: #166534; }
+        .cell-empty { background-color: #f1f5f9; border-color: #94a3b8; border-style: dashed; color: transparent; }
+        
+        /* 代码高亮 */
+        .code-line { display: block; padding: 0px 8px; border-radius: 4px; transition: background-color 0.2s; line-height: 1.5; }
+        .code-line.active { background-color: rgba(234, 179, 8, 0.3); border-left: 4px solid #eab308; }
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题与 408 考点 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                🧮 计数排序 (含负数处理) <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408 核心算法</span>
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">非比较型排序：用空间换时间，通过“前缀和”定位绝对坐标，利用“偏移量”处理负数。</p>
+        </div>
+        
+        <!-- 408 核心考点 -->
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700 max-w-2xl shadow-inner w-full md:w-auto">
+            <h3 class="font-bold text-red-600 mb-1">🔥 408 考研核心定则 (计数排序)：</h3>
+            <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                <li><span class="font-bold">时间复杂度：</span><strong class="text-blue-600">O(n + k)</strong> (n是元素个数, k是数值范围max-min+1)</li>
+                <li><span class="font-bold">空间复杂度：</span><strong class="text-blue-600">O(n + k)</strong> (需计数数组C和输出数组B)</li>
+                <li><span class="font-bold">稳定性：</span><strong class="text-green-600">稳定 (Stable)</strong> (前提是必须逆序遍历A数组填入B)</li>
+                <li><span class="font-bold">负数处理：</span>引入 <code>min</code> 偏移，元素 <code>x</code> 存入 <code>C[x - min]</code>。</li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col gap-4">
+        
+        <!-- 控制台 -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-2">
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex-1 min-w-[200px]">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-slate-600 whitespace-nowrap">数组 (含负数):</label>
+                        <input type="text" id="array-input" value="2, -1, 3, -1, 0, 2" 
+                               class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generateRandom()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition font-medium text-sm">🎲 随机生成</button>
+                    <button onclick="initSort()" class="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-medium text-sm shadow-sm">载入并重置</button>
+                </div>
+                <div class="h-6 border-l border-slate-300 mx-1 hidden lg:block"></div>
+                <div class="flex items-center gap-2">
+                    <button onclick="prevStep()" id="btn-prev" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 disabled:opacity-50 transition text-sm">上一条</button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-5 py-1.5 bg-green-500 text-white rounded font-bold hover:bg-green-600 transition shadow-sm w-24 text-sm">▶ 播放</button>
+                    <button onclick="nextStep()" id="btn-next" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 disabled:opacity-50 transition text-sm">下一条</button>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-xs text-slate-500">速度:</span>
+                    <input type="range" id="speed-slider" min="300" max="2500" value="1200" class="w-20" style="direction: rtl;">
+                    <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-full" id="step-counter">0 / 0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 核心视图区域 (分左右) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+            
+            <!-- 左侧：数组可视化视图 -->
+            <div class="lg:col-span-2 flex flex-col gap-4">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-center justify-center min-h-[400px] gap-6">
+                    
+                    <!-- 顶栏状态信息 -->
+                    <div class="flex w-full justify-between px-4 text-sm font-medium text-slate-600 border-b border-slate-100 pb-2">
+                        <div id="min-max-display" class="flex gap-4">
+                            <span>MIN: <span class="font-bold text-blue-600">-</span></span>
+                            <span>MAX: <span class="font-bold text-red-600">-</span></span>
+                            <span>RANGE: <span class="font-bold text-purple-600">-</span></span>
+                        </div>
+                    </div>
+
+                    <!-- 原数组 A -->
+                    <div class="w-full">
+                        <div class="text-xs font-bold text-slate-400 mb-2 ml-2">1. 输入数组 A (Input)</div>
+                        <div id="arr-a-container" class="flex overflow-x-auto no-scrollbar gap-2 px-2 pb-2"></div>
+                    </div>
+
+                    <!-- 计数数组 C -->
+                    <div class="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 relative">
+                        <div class="absolute -top-3 left-3 bg-slate-50 px-2 text-xs font-bold text-slate-500">2. 计数数组 C (Count Array)</div>
+                        <div id="arr-c-container" class="flex overflow-x-auto no-scrollbar gap-2 px-1 pt-3 pb-1"></div>
+                        <div class="text-[10px] text-slate-400 mt-2 text-center">↑ 映射关系：索引 index = 真实值 val - MIN</div>
+                    </div>
+
+                    <!-- 输出数组 B -->
+                    <div class="w-full">
+                        <div class="text-xs font-bold text-slate-400 mb-2 ml-2">3. 输出数组 B (Output)</div>
+                        <div id="arr-b-container" class="flex overflow-x-auto no-scrollbar gap-2 px-2 pb-2"></div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 右侧：解说与代码 -->
+            <div class="flex flex-col gap-4 h-full">
+                <!-- 算法解说面板 -->
+                <div class="bg-slate-800 rounded-xl shadow-md border border-slate-700 p-5 flex flex-col min-h-[200px]">
+                    <h2 class="font-bold text-slate-200 mb-3 border-b border-slate-600 pb-2 flex items-center gap-2">
+                        💡 步骤解析
+                    </h2>
+                    <div id="explanation-box" class="text-[14px] leading-relaxed overflow-y-auto no-scrollbar flex-1 text-slate-300">
+                        等待初始化...
+                    </div>
+                </div>
+
+                <!-- C语言代码面板 -->
+                <div class="bg-[#1e1e1e] rounded-xl shadow-md border border-slate-700 overflow-hidden flex flex-col flex-1">
+                    <div class="bg-[#2d2d2d] px-4 py-2 flex justify-between items-center border-b border-[#3d3d3d]">
+                        <span class="text-xs text-gray-400 font-mono">CountingSort.c (稳定版)</span>
+                    </div>
+                    <div class="p-2 overflow-x-auto text-[12px] font-mono text-gray-300 bg-[#1e1e1e]">
+<pre><code id="code-container">
+<span id="line-1" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">CountingSort</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> n) {</span>
+<span id="line-2" class="code-line">    <span class="text-pink-400">if</span> (n <= <span class="text-orange-400">1</span>) <span class="text-pink-400">return</span>;</span>
+<span id="line-3" class="code-line">    <span class="text-pink-400">int</span> min = A[<span class="text-orange-400">0</span>], max = A[<span class="text-orange-400">0</span>];</span>
+<span id="line-4" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = <span class="text-orange-400">1</span>; i < n; i++) { <span class="text-gray-500">// 1. 找最值</span></span>
+<span id="line-5" class="code-line">        <span class="text-pink-400">if</span> (A[i] < min) min = A[i];</span>
+<span id="line-6" class="code-line">        <span class="text-pink-400">if</span> (A[i] > max) max = A[i];</span>
+<span id="line-7" class="code-line">    }</span>
+<span id="line-8" class="code-line">    <span class="text-pink-400">int</span> range = max - min + <span class="text-orange-400">1</span>;</span>
+<span id="line-9" class="code-line">    <span class="text-pink-400">int</span>* C = (<span class="text-pink-400">int</span>*)<span class="text-blue-400">calloc</span>(range, <span class="text-pink-400">sizeof</span>(<span class="text-pink-400">int</span>)); <span class="text-gray-500">// 计数组</span></span>
+<span id="line-10" class="code-line">    <span class="text-pink-400">int</span>* B = (<span class="text-pink-400">int</span>*)<span class="text-blue-400">malloc</span>(n * <span class="text-pink-400">sizeof</span>(<span class="text-pink-400">int</span>));  <span class="text-gray-500">// 输出组</span></span>
+<span id="line-11" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = <span class="text-orange-400">0</span>; i < n; i++) C[A[i] - min]++; <span class="text-gray-500">// 2. 频率统计</span></span>
+<span id="line-12" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = <span class="text-orange-400">1</span>; i < range; i++) C[i] += C[i - <span class="text-orange-400">1</span>]; <span class="text-gray-500">// 3. 前缀和</span></span>
+<span id="line-13" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = n - <span class="text-orange-400">1</span>; i >= <span class="text-orange-400">0</span>; i--) { <span class="text-gray-500">// 4. 逆序组装(保证稳定)</span></span>
+<span id="line-14" class="code-line">        B[C[A[i] - min] - <span class="text-orange-400">1</span>] = A[i];</span>
+<span id="line-15" class="code-line">        C[A[i] - min]--;</span>
+<span id="line-16" class="code-line">    }</span>
+<span id="line-17" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = <span class="text-orange-400">0</span>; i < n; i++) A[i] = B[i]; <span class="text-gray-500">// 5. 写回原数组</span></span>
+<span id="line-18" class="code-line">    <span class="text-blue-400">free</span>(C); <span class="text-blue-400">free</span>(B);</span>
+<span id="line-19" class="code-line">}</span>
+</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心算法：生成步骤快照
+ * ========================================================================= */
+let steps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+function generateSteps(A) {
+    let stepsOut = [];
+    let n = A.length;
+    let min = null, max = null, range = null;
+    let C = [], B = Array(n).fill('');
+
+    // 工具：深拷贝数组状态
+    const pushStep = (line, msg, hlA, hlC, hlB, finalB = []) => {
+        stepsOut.push({
+            A: [...A], C: [...C], B: [...B],
+            min, max, range,
+            hlA: hlA ?? -1, hlC: hlC ?? -1, hlB: hlB ?? -1, finalB: [...finalB],
+            line, msg
+        });
+    };
+
+    pushStep(1, `<strong>初始状态：</strong>输入数组 A 共有 ${n} 个元素。<br>首先我们需要遍历数组寻找最小值和最大值，以便处理负数并确定计数数组的范围。`);
+
+    // 1. 找最值
+    min = A[0]; max = A[0];
+    pushStep(3, `假定 <code>min = ${min}</code>, <code>max = ${max}</code>。`, 0);
+    for (let i = 1; i < n; i++) {
+        let oldMin = min, oldMax = max;
+        if (A[i] < min) min = A[i];
+        if (A[i] > max) max = A[i];
+        if(oldMin !== min || oldMax !== max) {
+            pushStep(5, `遍历到 A[${i}] = ${A[i]}，更新最值：<code>min = ${min}</code>, <code>max = ${max}</code>。`, i);
+        } else {
+            pushStep(4, `遍历到 A[${i}] = ${A[i]}，最值未变。`, i);
+        }
+    }
+
+    // 2. 初始化 C 和 B
+    range = max - min + 1;
+    C = Array(range).fill(0);
+    pushStep(8, `<strong>核心考点 (处理负数)：</strong><br>根据 <code>range = max - min + 1 = ${max} - (${min}) + 1 = ${range}</code>。<br>创建长度为 ${range} 的计数数组 C，所有元素初始化为 0。<br>创建长度为 ${n} 的输出数组 B。<br><span class="text-blue-500">映射关系：A中的元素 <code>x</code> 将存储在 <code>C[x - min]</code> 中。</span>`, -1);
+
+    // 3. 统计频率
+    for (let i = 0; i < n; i++) {
+        let val = A[i];
+        let cIdx = val - min;
+        C[cIdx]++;
+        pushStep(11, `<strong>统计频率：</strong>读取 A[${i}] = ${val}。<br>由于存在偏移量，将其映射到 <code>C[val - min] = C[${val} - (${min})] = C[${cIdx}]</code>。<br><code>C[${cIdx}]</code> 的值加一，变为 ${C[cIdx]}。`, i, cIdx);
+    }
+
+    pushStep(12, `<strong>统计完成：</strong>数组 C 现已记录了 A 中每个元素的出现次数。<br>接下来计算 C 的<strong>前缀和</strong>，以确定每个元素在排序后的最终绝对位置。`);
+
+    // 4. 前缀和
+    for (let i = 1; i < range; i++) {
+        let oldVal = C[i];
+        C[i] += C[i - 1];
+        pushStep(12, `<strong>计算前缀和：</strong><br><code>C[${i}] = C[${i}] + C[${i-1}] = ${oldVal} + ${C[i-1]} = ${C[i]}</code>。<br>这表示：小于等于映射值 ${i} (即真实值 ${i+min}) 的元素总共有 ${C[i]} 个。`, -1, i);
+    }
+
+    // 5. 逆序组装
+    let finalB = [];
+    pushStep(13, `<strong>逆序遍历原数组 (保证稳定性)：</strong><br>从后往前遍历 A，通过前缀和 C 将元素放入输出数组 B。<br>因为是逆序，后出现的相同元素会被放在更靠后的物理位置，从而保持原有相对顺序（稳定）。`);
+    for (let i = n - 1; i >= 0; i--) {
+        let val = A[i];
+        let cIdx = val - min;
+        let bIdx = C[cIdx] - 1; // 转换为 0-based 索引
+        
+        pushStep(14, `<strong>填入输出数组：</strong><br>1. 逆序读取 A[${i}] = <span class="text-blue-500 font-bold">${val}</span>。<br>2. 查表 <code>C[${val} - (${min})] = C[${cIdx}] = ${C[cIdx]}</code>，说明它是第 ${C[cIdx]} 个元素。<br>3. 放入数组 B 的索引 <code>${C[cIdx]} - 1 = ${bIdx}</code> 处。`, i, cIdx, -1, finalB);
+        
+        B[bIdx] = val;
+        finalB.push(bIdx); // 记录已就位的 B 索引
+        C[cIdx]--;
+        
+        pushStep(15, `<strong>更新计数：</strong><br>成功将 ${val} 放入 <code>B[${bIdx}]</code>。<br>因为分配掉了一个位置，将 <code>C[${cIdx}]</code> 减 1 变为 ${C[cIdx]}。`, i, cIdx, bIdx, finalB);
+    }
+
+    // 6. 写回原数组
+    pushStep(17, `<strong>组装完成：</strong>数组 B 已成为完全有序的序列。<br>最后一步：将 B 中的内容按顺序写回原数组 A。`, -1, -1, -1, finalB);
+    A = [...B];
+    pushStep(17, `<strong>写回完成：</strong>A 数组已更新。`, 'all', -1, -1, finalB);
+
+    pushStep(19, `🎉 <strong>排序完毕！</strong><br>时间复杂度 O(n+k)，空间复杂度 O(n+k)，排序过程稳定。`, -1, -1, -1, finalB);
+
+    return stepsOut;
+}
+
+/* =========================================================================
+ * 2. 界面渲染
+ * ========================================================================= */
+const arrAContainer = document.getElementById('arr-a-container');
+const arrCContainer = document.getElementById('arr-c-container');
+const arrBContainer = document.getElementById('arr-b-container');
+const expBox = document.getElementById('explanation-box');
+
+function renderStep(idx) {
+    if (idx < 0 || idx >= steps.length) return;
+    const step = steps[idx];
+
+    // 代码高亮
+    document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+    const lineEl = document.getElementById(`line-${step.line}`);
+    if (lineEl) lineLine = lineEl.classList.add('active');
+
+    // 解说
+    expBox.innerHTML = step.msg;
+
+    // 状态栏
+    const displayMin = step.min !== null ? step.min : '-';
+    const displayMax = step.max !== null ? step.max : '-';
+    const displayRange = step.range !== null ? step.range : '-';
+    document.getElementById('min-max-display').innerHTML = `
+        <span>MIN: <span class="font-bold text-blue-600">${displayMin}</span></span>
+        <span>MAX: <span class="font-bold text-red-600">${displayMax}</span></span>
+        <span>RANGE: <span class="font-bold text-purple-600">${displayRange}</span></span>
+    `;
+
+    // 渲染 A 数组
+    arrAContainer.innerHTML = '';
+    step.A.forEach((v, i) => {
+        let isActive = step.hlA === i || step.hlA === 'all';
+        let cls = isActive ? 'cell-active' : 'cell-default';
+        if (step.hlA === 'all') cls = 'cell-final'; // 最后一步全绿
+        arrAContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex flex-col items-center">
+                <div class="text-[10px] text-slate-400 mb-1">A[${i}]</div>
+                <div class="w-10 h-10 border-2 rounded flex items-center justify-center font-bold text-sm cell-transition ${cls}">${v}</div>
+            </div>
+        `);
+    });
+
+    // 渲染 C 数组
+    arrCContainer.innerHTML = '';
+    if(step.C.length > 0) {
+        step.C.forEach((v, i) => {
+            let isActive = step.hlC === i;
+            let cls = isActive ? 'cell-active' : 'cell-default';
+            let realVal = step.min !== null ? step.min + i : '?';
+            arrCContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex flex-col items-center">
+                    <div class="text-[10px] font-bold text-blue-500 mb-1">val: ${realVal}</div>
+                    <div class="w-10 h-10 border-2 border-dashed rounded flex items-center justify-center font-bold text-sm cell-transition ${cls}">${v}</div>
+                    <div class="text-[10px] text-slate-400 mt-1">C[${i}]</div>
+                </div>
+            `);
+        });
+    } else {
+        arrCContainer.innerHTML = `<div class="text-sm text-slate-400 italic h-10 flex items-center px-4">等待找出最值...</div>`;
+    }
+
+    // 渲染 B 数组
+    arrBContainer.innerHTML = '';
+    if (step.range !== null) {
+        step.B.forEach((v, i) => {
+            let isFinal = step.finalB && step.finalB.includes(i);
+            let isActive = step.hlB === i;
+            let isEmpty = v === '';
+            
+            let cls = 'cell-default';
+            if (isEmpty) cls = 'cell-empty';
+            else if (isActive) cls = 'cell-active';
+            else if (isFinal) cls = 'cell-final';
+
+            arrBContainer.insertAdjacentHTML('beforeend', `
+                <div class="flex flex-col items-center">
+                    <div class="text-[10px] text-slate-400 mb-1">B[${i}]</div>
+                    <div class="w-10 h-10 border-2 rounded flex items-center justify-center font-bold text-sm cell-transition ${cls}">${v}</div>
+                </div>
+            `);
+        });
+    } else {
+        arrBContainer.innerHTML = `<div class="text-sm text-slate-400 italic h-10 flex items-center px-4">等待构建...</div>`;
+    }
+
+    updateControls();
+}
+
+/* =========================================================================
+ * 3. 播放控制
+ * ========================================================================= */
+function updateControls() {
+    const total = steps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '0 / 0' : `${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停';
+        playBtn.className = 'px-5 py-1.5 bg-yellow-500 text-white rounded font-bold hover:bg-yellow-600 transition shadow-sm w-24 text-sm';
+    } else {
+        playBtn.innerText = '▶ 播放';
+        playBtn.className = 'px-5 py-1.5 bg-green-500 text-white rounded font-bold hover:bg-green-600 transition shadow-sm w-24 text-sm';
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < steps.length) {
+        currentStepIdx = idx;
+        renderStep(currentStepIdx);
+    }
+}
+
+function nextStep() { if (currentStepIdx < steps.length - 1) showStep(currentStepIdx + 1); else stopPlay(); }
+function prevStep() { if (currentStepIdx > 0) showStep(currentStepIdx - 1); }
+
+function togglePlay() {
+    if(steps.length === 0) return;
+    if (playInterval) stopPlay();
+    else {
+        if (currentStepIdx >= steps.length - 1) currentStepIdx = 0; 
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value); 
+        playInterval = setInterval(nextStep, speed);
+        updateControls();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) { clearInterval(playInterval); playInterval = null; updateControls(); }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } 
+});
+
+function initSort() {
+    stopPlay();
+    const inputStr = document.getElementById('array-input').value;
+    const initialArr = inputStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    
+    if (initialArr.length < 2) {
+        alert("请输入至少包含两个数字的数组（以逗号分隔）。"); return;
+    }
+    if (initialArr.length > 15) {
+        alert("为保证显示效果，建议数组长度不超过 15 个元素。"); return;
+    }
+    
+    // 防御性校验：如果范围过大，导致数组 C 太长，UI会崩溃
+    let min = Math.min(...initialArr);
+    let max = Math.max(...initialArr);
+    if (max - min > 20) {
+        alert(`最大值和最小值的差值 (${max - min}) 过大！\n计数排序适用于极差较小的情况。为了图解的视觉效果，请确保数组极差不超过 20。`);
+        return;
+    }
+
+    document.getElementById('array-input').value = initialArr.join(', ');
+    steps = generateSteps(initialArr);
+    currentStepIdx = 0;
+    renderStep(0);
+}
+
+function generateRandom() {
+    const len = Math.floor(Math.random() * 4) + 6; // 6 ~ 9 个元素
+    const arr = [];
+    for(let i=0; i<len; i++) {
+        // 随机生成 -3 到 5 之间的数字（演示负数）
+        arr.push(Math.floor(Math.random() * 9) - 3); 
+    }
+    document.getElementById('array-input').value = arr.join(', ');
+    initSort();
+}
+
+document.getElementById('array-input').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') initSort();
+});
+
+window.onload = initSort;
+</script>
+</body>
+</html>

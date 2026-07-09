@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快速排序 (Quick Sort) - 408 考研级图解</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        
+        .array-cell { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        /* 颜色状态字典 */
+        .cell-final { background-color: #dcfce7; border-color: #22c55e; color: #166534; } /* 最终就位 (绿色) */
+        .cell-active { background-color: #fef08a; border-color: #eab308; color: #854d0e; } /* 当前处理区间 (黄色) */
+        .cell-inactive { background-color: #f1f5f9; border-color: #cbd5e1; color: #94a3b8; } /* 非处理区间 (灰色) */
+        .cell-hole { background-color: #ffffff; border-color: #94a3b8; border-style: dashed; color: transparent; } /* 坑位 */
+        
+        /* 代码行高亮 */
+        .code-line { display: block; padding: 0px 8px; border-radius: 4px; transition: background-color 0.2s; line-height: 1.6;}
+        .code-line.active { background-color: rgba(234, 179, 8, 0.3); border-left: 4px solid #eab308; }
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题与 408 考点 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                ⚡ 快速排序 (挖坑法 + 递归栈) <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408 核心算法</span>
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">基于分治思想：一趟排序使基准元素到达最终位置，将数组一分为二并递归处理。</p>
+        </div>
+        
+        <!-- 408 核心考点 -->
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700 max-w-2xl shadow-inner w-full md:w-auto">
+            <h3 class="font-bold text-red-600 mb-1">🔥 408 考研核心定则 (快速排序)：</h3>
+            <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                <li><span class="font-bold">时间复杂度：</span>最好/平均 <strong class="text-blue-600">O(n log n)</strong>，最坏 O(n²) (原本就有序)</li>
+                <li><span class="font-bold">空间复杂度：</span>取决于递归栈深度，最好 <strong class="text-blue-600">O(log n)</strong>，最坏 O(n)</li>
+                <li><span class="font-bold">稳定性：</span><strong class="text-red-600">不稳定 (Unstable)</strong> (跨越式交换)</li>
+                <li><span class="font-bold">核心考点：</span>每一趟排序后，<strong class="text-green-600">必有一个元素(基准)到达最终位置</strong>。</li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col gap-4">
+        
+        <!-- 上方：控制台与数组视图区 -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            
+            <!-- 控制栏 -->
+            <div class="flex flex-wrap items-end gap-3 mb-6 border-b border-slate-100 pb-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-slate-600 mb-1">数组序列 (逗号分隔):</label>
+                    <input type="text" id="array-input" value="49, 38, 65, 97, 76, 13, 27, 49" 
+                           class="w-full px-4 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generateRandom()" class="px-4 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition font-medium text-sm">🎲 随机生成</button>
+                    <button onclick="initSort()" class="px-5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm shadow-sm">载入重置</button>
+                </div>
+                <div class="h-8 border-l border-slate-300 mx-2 hidden lg:block"></div>
+                <div class="flex items-center gap-2">
+                    <button onclick="prevStep()" id="btn-prev" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition text-sm">上一条</button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-5 py-1.5 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-28 text-sm">▶ 播放</button>
+                    <button onclick="nextStep()" id="btn-next" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition text-sm">下一条</button>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-xs text-slate-500">速度:</span>
+                    <input type="range" id="speed-slider" min="300" max="2500" value="1200" class="w-20" style="direction: rtl;">
+                    <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-full" id="step-counter">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- 可视化展示区 (仅包含数组和基准变量) -->
+            <div class="flex flex-col items-center min-h-[160px]">
+                <!-- 辅助变量 Pivot 区及图例 -->
+                <div class="flex items-center gap-4 mb-4 w-full justify-center">
+                    <div class="flex flex-col items-center bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
+                        <span class="text-xs font-bold text-red-500 mb-1 tracking-wider">基准值 (Pivot)</span>
+                        <div id="pivot-container" class="w-10 h-10 border-2 border-dashed border-slate-400 rounded-lg flex items-center justify-center text-base font-bold text-slate-400 bg-white">
+                            空
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1 text-xs text-slate-500 font-medium ml-4">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#fef08a] border border-[#eab308]"></span> 当前划分区间</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#dcfce7] border border-[#22c55e]"></span> 最终就位元素</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-slate-400 border-dashed"></span> 挖出的"坑"</div>
+                    </div>
+                </div>
+
+                <!-- 数组主体 -->
+                <div class="relative w-full overflow-x-auto no-scrollbar pb-6 flex justify-center">
+                    <div id="array-container" class="flex justify-center gap-2 sm:gap-3 px-4 min-w-max">
+                        <!-- 动态生成数组格子 -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 下方：步骤解说 + 递归栈联动 + 代码联动 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+            
+            <!-- 左侧区域：包含解说和栈 -->
+            <div class="flex flex-col gap-4">
+                <!-- 算法解说面板 -->
+                <div class="bg-slate-800 rounded-xl shadow-md border border-slate-700 p-5 flex flex-col flex-1 min-h-[180px]">
+                    <h2 class="font-bold text-slate-200 mb-3 border-b border-slate-600 pb-2 flex items-center gap-2">
+                        💡 步骤解析
+                    </h2>
+                    <div id="explanation-box" class="text-[15px] leading-relaxed overflow-y-auto no-scrollbar flex-1 text-slate-300">
+                        等待初始化...
+                    </div>
+                </div>
+
+                <!-- 递归工作栈面板 -->
+                <div class="bg-[#282a36] rounded-xl shadow-md border border-[#44475a] p-4 flex flex-col h-48 shrink-0">
+                    <h2 class="font-bold text-[#8be9fd] mb-2 border-b border-[#44475a] pb-2 flex justify-between items-center text-sm">
+                        <span>📚 递归工作栈 (Call Stack)</span>
+                        <span class="text-xs font-normal text-gray-400">最上方为当前活跃栈帧</span>
+                    </h2>
+                    <div id="stack-container" class="flex flex-col-reverse gap-2 overflow-y-auto no-scrollbar flex-1 pb-1">
+                        <!-- 动态生成的栈帧 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧区域：C语言代码高亮面板 -->
+            <div class="bg-[#1e1e1e] rounded-xl shadow-md border border-slate-700 overflow-hidden flex flex-col h-full">
+                <div class="bg-[#2d2d2d] px-4 py-2 flex justify-between items-center border-b border-[#3d3d3d]">
+                    <span class="text-xs text-gray-400 font-mono">QuickSort.c (教材标准版)</span>
+                </div>
+                <div class="p-3 overflow-x-auto text-[13px] font-mono text-gray-300 bg-[#1e1e1e] flex-1">
+<pre><code id="code-container">
+<span id="line-1" class="code-line"><span class="text-pink-400">int</span> <span class="text-blue-400">Partition</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> low, <span class="text-pink-400">int</span> high) {</span>
+<span id="line-2" class="code-line">    <span class="text-pink-400">int</span> pivot = A[low]; <span class="text-gray-500">// 将表首元素作为基准，形成"坑"</span></span>
+<span id="line-3" class="code-line">    <span class="text-pink-400">while</span> (low < high) {</span>
+<span id="line-4" class="code-line">        <span class="text-pink-400">while</span> (low < high && A[high] >= pivot) --high;</span>
+<span id="line-5" class="code-line">        A[low] = A[high]; <span class="text-gray-500">// 比基准小的移到左端坑位，high成新坑</span></span>
+<span id="line-6" class="code-line">        <span class="text-pink-400">while</span> (low < high && A[low] <= pivot) ++low;</span>
+<span id="line-7" class="code-line">        A[high] = A[low]; <span class="text-gray-500">// 比基准大的移到右端坑位，low成新坑</span></span>
+<span id="line-8" class="code-line">    }</span>
+<span id="line-9" class="code-line">    A[low] = pivot; <span class="text-gray-500">// 基准元素放到最终坑位</span></span>
+<span id="line-10" class="code-line">    <span class="text-pink-400">return</span> low;     <span class="text-gray-500">// 返回存放基准的最终位置</span></span>
+<span id="line-11" class="code-line">}</span>
+<span id="line-12" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">QuickSort</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> low, <span class="text-pink-400">int</span> high) {</span>
+<span id="line-13" class="code-line">    <span class="text-pink-400">if</span> (low < high) {</span>
+<span id="line-14" class="code-line">        <span class="text-pink-400">int</span> pivotpos = Partition(A, low, high);</span>
+<span id="line-15" class="code-line">        QuickSort(A, low, pivotpos - <span class="text-orange-400">1</span>);</span>
+<span id="line-16" class="code-line">        QuickSort(A, pivotpos + <span class="text-orange-400">1</span>, high);</span>
+<span id="line-17" class="code-line">    }</span>
+<span id="line-18" class="code-line">}</span>
+</code></pre>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心算法：生成步骤快照（带递归栈追踪）
+ * ========================================================================= */
+let steps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+function generateSteps(initialArray) {
+    let stepsOut = [];
+    let arr = [...initialArray];
+    let finalPos = new Set();
+    let currentStack = []; // 跟踪真实的递归函数栈
+    let n = arr.length;
+
+    // 辅助闭包函数，统一推送状态
+    function pushStep(line, msg, range, pLow, pHigh, pivot, hole) {
+        stepsOut.push({
+            arr: [...arr],
+            range: range || [-1, -1],
+            pLow: pLow ?? -1,
+            pHigh: pHigh ?? -1,
+            pivot: pivot !== undefined ? pivot : null,
+            hole: hole ?? -1,
+            finalPos: new Set(finalPos),
+            line: line,
+            callStack: JSON.parse(JSON.stringify(currentStack)), // 深拷贝当前栈状态
+            msg: msg
+        });
+    }
+
+    // 递归模拟函数
+    function simulateQS(low, high) {
+        // 模拟函数压栈
+        currentStack.push({ label: `QuickSort(A, ${low}, ${high})` });
+
+        pushStep(13, `<strong>进入 QuickSort：</strong><br>向工作栈中压入栈帧 <code>QuickSort(${low}, ${high})</code>。当前处理区间 <code>[${low}..${high}]</code>。检查递归条件 <code>low < high</code>。`, [low, high]);
+
+        if (low < high) {
+            pushStep(14, `条件成立，调用 <code>Partition</code> 函数对区间 <code>[${low}..${high}]</code> 进行划分。`, [low, high]);
+
+            // 模拟 Partition
+            let pLow = low;
+            let pHigh = high;
+            let pivot = arr[pLow];
+            let hole = pLow;
+
+            pushStep(2, `<strong>选定基准与挖坑：</strong><br>将首个元素 <code>A[${low}]=${pivot}</code> 提取为基准(Pivot)，此时 <code>A[${low}]</code> 形成一个“坑”。`, [low, high], pLow, pHigh, pivot, hole);
+            pushStep(3, `进入外层循环 <code>while (low < high)</code>，准备交替移动指针。`, [low, high], pLow, pHigh, pivot, hole);
+
+            while (pLow < pHigh) {
+                // 右侧寻找比 pivot 小的
+                pushStep(4, `<strong>high 指针左移：</strong>在右侧寻找严格小于基准 ${pivot} 的元素。`, [low, high], pLow, pHigh, pivot, hole);
+                while (pLow < pHigh && arr[pHigh] >= pivot) {
+                    pHigh--;
+                    pushStep(4, `<code>A[${pHigh+1}]=${arr[pHigh+1]} &ge; ${pivot}</code>，不符合填坑要求，high 指针继续左移到 ${pHigh}。`, [low, high], pLow, pHigh, pivot, hole);
+                }
+                if (pLow < pHigh) {
+                    arr[hole] = arr[pHigh];
+                    let oldHole = hole;
+                    hole = pHigh;
+                    pushStep(5, `<strong>右坑左填：</strong>找到 <code>A[${pHigh}]=${arr[pHigh]} < ${pivot}</code>。<br>将其填入左侧的坑 <code>A[${oldHole}]</code> 中，此时 <code>A[${pHigh}]</code> 成为新的坑。`, [low, high], pLow, pHigh, pivot, hole);
+                }
+
+                // 左侧寻找比 pivot 大的
+                pushStep(6, `<strong>low 指针右移：</strong>在左侧寻找严格大于基准 ${pivot} 的元素。`, [low, high], pLow, pHigh, pivot, hole);
+                while (pLow < pHigh && arr[pLow] <= pivot) {
+                    pLow++;
+                    pushStep(6, `<code>A[${pLow-1}]=${arr[pLow-1]} &le; ${pivot}</code>，不符合填坑要求，low 指针继续右移到 ${pLow}。`, [low, high], pLow, pHigh, pivot, hole);
+                }
+                if (pLow < pHigh) {
+                    arr[hole] = arr[pLow];
+                    let oldHole = hole;
+                    hole = pLow;
+                    pushStep(7, `<strong>左坑右填：</strong>找到 <code>A[${pLow}]=${arr[pLow]} > ${pivot}</code>。<br>将其填入右侧的坑 <code>A[${oldHole}]</code> 中，此时 <code>A[${pLow}]</code> 成为新的坑。`, [low, high], pLow, pHigh, pivot, hole);
+                }
+            }
+
+            // 循环结束，填最终坑
+            arr[hole] = pivot;
+            finalPos.add(hole); // 该位置确定
+
+            pushStep(9, `<strong>基准最终就位：</strong>low 与 high 相遇于 ${hole}，划分结束。<br>暂存的基准 ${pivot} 填入最终坑位 <code>A[${hole}]</code>。<br><span class="text-green-400 font-bold">考点：一趟排序后，基准元素必然到达最终位置！</span>`, [low, high], pLow, pHigh, pivot, -1);
+            pushStep(10, `返回基准位置 <code>pivotpos = ${hole}</code>，当前区间划分完毕。`, [low, high], -1, -1, null, -1);
+
+            // 递归左右
+            pushStep(15, `准备进入<strong>左侧子区间</strong> <code>[${low}..${hole - 1}]</code> 的递归。`, [low, high], -1, -1, null, -1);
+            simulateQS(low, hole - 1);
+
+            pushStep(16, `左子树处理完毕。准备进入<strong>右侧子区间</strong> <code>[${hole + 1}..${high}]</code> 的递归。`, [low, high], -1, -1, null, -1);
+            simulateQS(hole + 1, high);
+
+        } else if (low === high) {
+            finalPos.add(low);
+            pushStep(13, `区间 <code>[${low}..${high}]</code> 只有一个元素，自然有序，将其标记为最终就位状态。该层递归不再继续深入。`, [low, high], -1, -1, null, -1);
+        } else {
+            pushStep(13, `区间无效（low > high），说明该侧无元素。`, [low, high], -1, -1, null, -1);
+        }
+
+        // 模拟函数弹栈出栈
+        let popped = currentStack.pop();
+        if (currentStack.length > 0) {
+            pushStep(18, `<code>${popped.label}</code> 执行完毕，弹出栈帧，返回上一层递归。`, [-1, -1], -1, -1, null, -1);
+        }
+    }
+
+    simulateQS(0, n - 1);
+
+    pushStep(18, `🎉 <strong>排序完成！</strong>所有递归栈帧均已弹出执行完毕，数组整体达到有序状态。`, [-1, -1], -1, -1, null, -1);
+
+    return stepsOut;
+}
+
+/* =========================================================================
+ * 2. 界面渲染控制 (数组恢复弹性盒子，新增栈的渲染)
+ * ========================================================================= */
+const arrayContainer = document.getElementById('array-container');
+const pivotContainer = document.getElementById('pivot-container');
+const explanationBox = document.getElementById('explanation-box');
+const stackContainer = document.getElementById('stack-container');
+
+function renderStep(index) {
+    if (index < 0 || index >= steps.length) return;
+    const step = steps[index];
+
+    // 1. 渲染代码高亮
+    document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+    const activeLine = document.getElementById(`line-${step.line}`);
+    if (activeLine) activeLine.classList.add('active');
+
+    // 2. 渲染解说文字
+    explanationBox.innerHTML = step.msg;
+
+    // 3. 渲染数组格子
+    arrayContainer.innerHTML = '';
+    step.arr.forEach((val, idx) => {
+        let isFinal = step.finalPos.has(idx);
+        let isActiveRange = idx >= step.range[0] && idx <= step.range[1];
+        let isHole = idx === step.hole;
+        let isLow = idx === step.pLow;
+        let isHigh = idx === step.pHigh;
+
+        let cssClass = 'cell-inactive opacity-60'; 
+        if (isFinal) cssClass = 'cell-final opacity-100 shadow-sm';
+        else if (isActiveRange) cssClass = 'cell-active opacity-100 shadow-md';
+        if (isHole) cssClass = 'cell-hole opacity-100 shadow-inner';
+
+        let pointerHtml = '';
+        if (isLow || isHigh) {
+            let pLabel = [];
+            let pColor = [];
+            if (isLow) { pLabel.push('L'); pColor.push('text-red-600'); }
+            if (isHigh) { pLabel.push('H'); pColor.push('text-blue-600'); }
+            let combinedLabel = pLabel.join('=');
+            let combinedColor = pLabel.length > 1 ? 'text-purple-600' : pColor[0];
+
+            pointerHtml = `
+                <div class="absolute -bottom-8 flex flex-col items-center w-full transition-all">
+                    <span class="text-[14px] font-bold ${combinedColor}">↑</span>
+                    <span class="text-[11px] font-bold ${combinedColor} -mt-1.5">${combinedLabel}</span>
+                </div>
+            `;
+        }
+
+        const cellHtml = `
+            <div class="relative flex flex-col items-center pb-8">
+                <div class="text-[10px] text-slate-400 mb-1">A[${idx}]</div>
+                <div class="w-10 h-12 sm:w-12 sm:h-14 border-2 rounded-lg flex items-center justify-center text-base sm:text-lg font-bold array-cell ${cssClass}">
+                    ${isHole ? '' : val}
+                </div>
+                ${pointerHtml}
+            </div>
+        `;
+        arrayContainer.insertAdjacentHTML('beforeend', cellHtml);
+    });
+
+    // 4. 渲染 Pivot 变量
+    if (step.pivot !== null) {
+        pivotContainer.innerHTML = step.pivot;
+        pivotContainer.className = "w-10 h-10 border-2 rounded-lg flex items-center justify-center text-lg font-bold bg-red-100 border-red-500 text-red-700 shadow-lg array-cell transform scale-110";
+    } else {
+        pivotContainer.innerHTML = "空";
+        pivotContainer.className = "w-10 h-10 border-2 border-dashed border-slate-400 rounded-lg flex items-center justify-center text-base font-bold text-slate-400 bg-white shadow-inner array-cell";
+    }
+
+    // 5. 渲染递归工作栈
+    stackContainer.innerHTML = '';
+    if (step.callStack && step.callStack.length > 0) {
+        step.callStack.forEach((frame, idx) => {
+            let isTop = idx === step.callStack.length - 1; // 栈顶即当前正在执行的函数
+            let bgClass = isTop ? 'bg-[#6272a4] text-white border-[#8be9fd] shadow-md z-10' : 'bg-[#44475a] text-gray-400 border-[#6272a4]';
+            let transformClass = isTop ? 'scale-100' : 'scale-[0.98] opacity-80';
+            
+            let html = `
+                <div class="border rounded px-3 py-2 text-[13px] font-mono transition-all transform ${transformClass} ${bgClass}">
+                    ${frame.label}
+                </div>
+            `;
+            // 使用 beforeend，结合外层的 flex-col-reverse，实现新入栈的元素在最顶上
+            stackContainer.insertAdjacentHTML('beforeend', html);
+        });
+    } else {
+        stackContainer.innerHTML = `<div class="text-xs text-gray-500 italic text-center mt-6">栈空 (递归执行完毕)</div>`;
+    }
+
+    updateControls();
+}
+
+/* =========================================================================
+ * 3. 播放与交互控制
+ * ========================================================================= */
+function updateControls() {
+    const total = steps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '0 / 0' : `${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停';
+        playBtn.className = 'px-5 py-1.5 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition shadow-sm w-28 text-sm';
+    } else {
+        playBtn.innerText = '▶ 播放';
+        playBtn.className = 'px-5 py-1.5 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-28 text-sm';
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < steps.length) {
+        currentStepIdx = idx;
+        renderStep(currentStepIdx);
+    }
+}
+
+function nextStep() {
+    if (currentStepIdx < steps.length - 1) showStep(currentStepIdx + 1);
+    else stopPlay();
+}
+
+function prevStep() {
+    if (currentStepIdx > 0) showStep(currentStepIdx - 1);
+}
+
+function togglePlay() {
+    if(steps.length === 0) return;
+    if (playInterval) {
+        stopPlay();
+    } else {
+        if (currentStepIdx >= steps.length - 1) currentStepIdx = 0; 
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value); 
+        playInterval = setInterval(nextStep, speed);
+        updateControls();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        updateControls();
+    }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } 
+});
+
+function initSort() {
+    stopPlay();
+    const inputStr = document.getElementById('array-input').value;
+    const initialArr = inputStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    
+    if (initialArr.length < 2) {
+        alert("请输入至少包含两个数字的数组（以逗号分隔）。");
+        return;
+    }
+    if (initialArr.length > 15) {
+        alert("为了演示效果和排版整洁，建议数组长度不超过 15 个元素。");
+        return;
+    }
+
+    document.getElementById('array-input').value = initialArr.join(', ');
+    
+    steps = generateSteps(initialArr);
+    currentStepIdx = 0;
+    renderStep(0);
+}
+
+function generateRandom() {
+    const len = Math.floor(Math.random() * 5) + 7; // 7 ~ 11 个元素
+    const arr = [];
+    for(let i=0; i<len; i++) {
+        arr.push(Math.floor(Math.random() * 90) + 10); 
+    }
+    document.getElementById('array-input').value = arr.join(', ');
+    initSort();
+}
+
+// 绑定回车键
+document.getElementById('array-input').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') initSort();
+});
+
+// 初始化
+window.onload = () => {
+    initSort();
+};
+</script>
+</body>
+</html>
