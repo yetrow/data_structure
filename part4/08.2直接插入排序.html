@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直接插入排序 (Insertion Sort) - 408 考研级图解</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        
+        /* 数组元素的通用样式和动画 */
+        .array-cell {
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        /* 不同状态的颜色映射 */
+        .cell-sorted { background-color: #dcfce7; border-color: #22c55e; color: #166534; } /* 浅绿，已排序区 */
+        .cell-unsorted { background-color: #ffffff; border-color: #cbd5e1; color: #334155; } /* 白色，未排序区 */
+        .cell-active-i { background-color: #fef08a; border-color: #eab308; color: #854d0e; transform: scale(1.05); shadow: md; } /* 黄色，当前外层正在处理的元素 */
+        .cell-active-j { background-color: #bfdbfe; border-color: #3b82f6; color: #1e3a8a; } /* 蓝色，当前正在比较的已排序区元素 */
+        .cell-empty { background-color: #f1f5f9; border-color: #94a3b8; border-style: dashed; color: transparent; } /* 腾出的空位 */
+        
+        /* 代码行高亮 */
+        .code-line { display: block; padding: 2px 8px; border-radius: 4px; transition: background-color 0.3s; }
+        .code-line.active { background-color: rgba(234, 179, 8, 0.3); border-left: 4px solid #eab308; }
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题与 408 考点 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                🃏 直接插入排序 <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408 核心算法</span>
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">就像打扑克牌时整理手牌：将新牌插入到前面已经排好序的牌堆中。</p>
+        </div>
+        
+        <!-- 408 核心考点 -->
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700 max-w-2xl shadow-inner w-full md:w-auto">
+            <h3 class="font-bold text-red-600 mb-1">🔥 408 考研核心定则 (直接插入排序)：</h3>
+            <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                <li><span class="font-bold">时间复杂度：</span>最好 O(n) (正序)，最坏 O(n²) (逆序)，平均 <strong class="text-blue-600">O(n²)</strong></li>
+                <li><span class="font-bold">空间复杂度：</span><strong class="text-blue-600">O(1)</strong> (仅需一个 temp 辅助变量)</li>
+                <li><span class="font-bold">稳定性：</span><strong class="text-green-600">稳定 (Stable)</strong> (大于才移动，等于不移动)</li>
+                <li><span class="font-bold">适用性：</span>适用于<strong class="text-blue-600">顺序表</strong>和<strong class="text-blue-600">单链表</strong> (基本有序时效率极高)</li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col gap-6">
+        
+        <!-- 上方：控制台与视图区 -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            
+            <!-- 控制栏 -->
+            <div class="flex flex-wrap items-end gap-4 mb-8 border-b border-slate-100 pb-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-slate-600 mb-1">数组序列 (逗号分隔):</label>
+                    <input type="text" id="array-input" value="49, 38, 65, 97, 76, 13, 27" 
+                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generateRandom()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition font-medium text-sm">🎲 随机生成</button>
+                    <button onclick="initSort()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm">载入并重置</button>
+                </div>
+                <div class="h-8 border-l border-slate-300 mx-2 hidden lg:block"></div>
+                <div class="flex items-center gap-2">
+                    <button onclick="prevStep()" id="btn-prev" class="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">上一条</button>
+                    <button onclick="togglePlay()" id="btn-play" class="px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32">▶ 自动播放</button>
+                    <button onclick="nextStep()" id="btn-next" class="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition">下一条</button>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-xs text-slate-500">速度:</span>
+                    <input type="range" id="speed-slider" min="300" max="2500" value="1000" class="w-24" style="direction: rtl;">
+                    <span class="text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full" id="step-counter">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- 可视化展示区 -->
+            <div class="flex flex-col items-center min-h-[220px]">
+                
+                <!-- 数组主体 -->
+                <div class="relative w-full overflow-x-auto no-scrollbar py-8">
+                    <div id="array-container" class="flex justify-center gap-2 sm:gap-4 px-4 min-w-max">
+                        <!-- 动态生成数组格子 -->
+                    </div>
+                </div>
+
+                <!-- 辅助变量 temp 区 -->
+                <div class="mt-4 flex flex-col items-center bg-slate-50 px-6 py-3 rounded-lg border border-slate-200">
+                    <span class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">辅助变量 (temp)</span>
+                    <div id="temp-container" class="w-14 h-14 border-2 border-dashed border-slate-400 rounded-lg flex items-center justify-center text-xl font-bold text-slate-400 bg-white shadow-inner">
+                        空
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-6 text-xs font-medium text-slate-500">
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#dcfce7] border border-[#22c55e]"></span> 已排序区</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#fef08a] border border-[#eab308]"></span> 待插入元素 (i)</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#bfdbfe] border border-[#3b82f6]"></span> 正在比较 (j)</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 下方：步骤解说 与 代码联动 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+            
+            <!-- 算法解说面板 -->
+            <div class="bg-slate-800 rounded-xl shadow-md border border-slate-700 p-6 flex flex-col">
+                <h2 class="font-bold text-slate-200 mb-4 border-b border-slate-600 pb-2 flex items-center gap-2">
+                    💡 当前步骤解析
+                </h2>
+                <div id="explanation-box" class="text-slate-300 text-[16px] leading-relaxed overflow-y-auto no-scrollbar flex-1">
+                    等待初始化...
+                </div>
+            </div>
+
+            <!-- C语言代码高亮面板 -->
+            <div class="bg-[#1e1e1e] rounded-xl shadow-md border border-slate-700 overflow-hidden flex flex-col">
+                <div class="bg-[#2d2d2d] px-4 py-2 flex justify-between items-center">
+                    <div class="flex gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <span class="text-xs text-gray-400 font-mono">InsertionSort.c</span>
+                </div>
+                <div class="p-4 overflow-x-auto text-[14px] font-mono leading-loose text-gray-300 bg-[#1e1e1e]">
+<pre><code id="code-container">
+<span id="line-1" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">InsertSort</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> n) {</span>
+<span id="line-2" class="code-line">    <span class="text-pink-400">int</span> i, j, temp;</span>
+<span id="line-3" class="code-line">    <span class="text-pink-400">for</span> (i = <span class="text-orange-400">1</span>; i < n; i++) {</span>
+<span id="line-4" class="code-line">        <span class="text-pink-400">if</span> (A[i] < A[i - <span class="text-orange-400">1</span>]) {  <span class="text-gray-500">// 若 A[i] 小于其前驱，则需插入</span></span>
+<span id="line-5" class="code-line">            temp = A[i];        <span class="text-gray-500">// 暂存哨兵/待插入元素</span></span>
+<span id="line-6" class="code-line">            <span class="text-pink-400">for</span> (j = i - <span class="text-orange-400">1</span>; j >= <span class="text-orange-400">0</span> && A[j] > temp; --j) {</span>
+<span id="line-7" class="code-line">                A[j + <span class="text-orange-400">1</span>] = A[j];  <span class="text-gray-500">// 将大于 temp 的元素后移</span></span>
+<span id="line-8" class="code-line">            }</span>
+<span id="line-9" class="code-line">            A[j + <span class="text-orange-400">1</span>] = temp;    <span class="text-gray-500">// 在空出的位置插入原 A[i]</span></span>
+<span id="line-10" class="code-line">        }</span>
+<span id="line-11" class="code-line">    }</span>
+<span id="line-12" class="code-line">}</span>
+</code></pre>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心算法：生成步骤快照（时光机模型）
+ * ========================================================================= */
+let steps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+function generateSteps(initialArray) {
+    let arr = [...initialArray];
+    let localSteps = [];
+    let n = arr.length;
+
+    localSteps.push({
+        displayArr: [...arr], sortedEnd: 0, temp: null, i: 1, j: -1, line: 2,
+        msg: `<strong>初始状态：</strong>数组共有 ${n} 个元素。<br>默认第 1 个元素（索引 0）已经自成一个有序区。我们将从索引 1 开始遍历，依次将后面的元素插入到前面的有序区中。`
+    });
+
+    for (let i = 1; i < n; i++) {
+        localSteps.push({
+            displayArr: [...arr], sortedEnd: i - 1, temp: null, i: i, j: -1, line: 3,
+            msg: `<strong>外层循环 (第 ${i} 趟)：</strong>开始处理索引为 <code>i = ${i}</code> 的元素 <strong>${arr[i]}</strong>。<br>此时前面的 <code>[0 ... ${i-1}]</code> 已经是排好序的区域。`
+        });
+
+        localSteps.push({
+            displayArr: [...arr], sortedEnd: i - 1, temp: null, i: i, j: i - 1, line: 4,
+            msg: `<strong>是否有序判定：</strong>比较当前元素 <strong>A[${i}]=${arr[i]}</strong> 与前一个元素 <strong>A[${i-1}]=${arr[i-1]}</strong>。<br>` +
+                 (arr[i] < arr[i - 1] ? `因为 <strong>${arr[i]} < ${arr[i-1]}</strong>，所以需要将它插入到前面。` : `因为 <strong>${arr[i]} ≥ ${arr[i-1]}</strong>，说明它已经处于正确位置，本趟无需移动。`)
+        });
+
+        if (arr[i] < arr[i - 1]) {
+            let temp = arr[i];
+            let displayArr = [...arr];
+            displayArr[i] = ''; // 在视觉上挖空该位置
+
+            localSteps.push({
+                displayArr: [...displayArr], sortedEnd: i - 1, temp: temp, i: i, j: i - 1, line: 5,
+                msg: `<strong>提取并暂存：</strong>将 <strong>${temp}</strong> 暂存到 <code>temp</code> 变量中。<br>此时数组索引 ${i} 处相当于腾出了一个“空位”。`
+            });
+
+            let j;
+            for (j = i - 1; j >= 0; j--) {
+                localSteps.push({
+                    displayArr: [...displayArr], sortedEnd: i - 1, temp: temp, i: i, j: j, line: 6,
+                    msg: `<strong>内层循环判定：</strong>检查索引 <code>j = ${j}</code>，比较 <strong>A[${j}]=${arr[j]}</strong> 和 temp(<strong>${temp}</strong>)。<br>` + 
+                         (arr[j] > temp ? `由于 <strong>${arr[j]} > ${temp}</strong>，满足后移条件。` : `由于 <strong>${arr[j]} ≤ ${temp}</strong>，不满足后移条件，找到了最终插入点！(保证了排序的<strong>稳定性</strong>)`)
+                });
+
+                if (arr[j] > temp) {
+                    displayArr[j + 1] = arr[j];
+                    displayArr[j] = ''; // 空位左移
+                    localSteps.push({
+                        displayArr: [...displayArr], sortedEnd: i - 1, temp: temp, i: i, j: j, line: 7,
+                        msg: `<strong>元素后移：</strong>将 <strong>${arr[j + 1]}</strong> 向后移动填补空位，现在空位转移到了索引 <code>${j}</code> 的位置。`
+                    });
+                } else {
+                    break;
+                }
+            }
+            
+            displayArr[j + 1] = temp;
+            arr = [...displayArr]; // 真实数组同步
+            
+            localSteps.push({
+                displayArr: [...arr], sortedEnd: i, temp: null, i: i, j: -1, line: 9,
+                msg: `<strong>完成插入：</strong>将暂存的 temp(<strong>${temp}</strong>) 放入最终确定的空位 <code>A[${j + 1}]</code> 中。<br>第 ${i} 趟排序结束。`
+            });
+
+        } else {
+            // 本身就有序，不用进入内层循环
+            localSteps.push({
+                displayArr: [...arr], sortedEnd: i, temp: null, i: i, j: -1, line: 10,
+                msg: `<strong>直接跳过：</strong>已排序区成功扩大，包含到了索引 ${i}。`
+            });
+        }
+    }
+
+    localSteps.push({
+        displayArr: [...arr], sortedEnd: n - 1, temp: null, i: n, j: -1, line: 12,
+        msg: `🎉 <strong>排序完成！</strong>所有元素都已在正确位置，整个数组变为有序序列。`
+    });
+
+    return localSteps;
+}
+
+/* =========================================================================
+ * 2. 界面渲染控制
+ * ========================================================================= */
+const arrayContainer = document.getElementById('array-container');
+const tempContainer = document.getElementById('temp-container');
+const explanationBox = document.getElementById('explanation-box');
+
+function renderStep(index) {
+    if (index < 0 || index >= steps.length) return;
+    const step = steps[index];
+
+    // 1. 渲染代码高亮
+    document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+    const activeLine = document.getElementById(`line-${step.line}`);
+    if (activeLine) activeLine.classList.add('active');
+
+    // 2. 渲染解说文字
+    explanationBox.innerHTML = step.msg;
+
+    // 3. 渲染数组格子
+    arrayContainer.innerHTML = '';
+    step.displayArr.forEach((val, idx) => {
+        let isSorted = idx <= step.sortedEnd && val !== '';
+        let isI = idx === step.i && step.i < step.displayArr.length;
+        let isJ = idx === step.j;
+        let isEmpty = val === '';
+
+        let cssClass = 'cell-unsorted';
+        if (isEmpty) cssClass = 'cell-empty';
+        else if (isJ) cssClass = 'cell-active-j shadow-md';
+        else if (isI) cssClass = 'cell-active-i shadow-lg z-10';
+        else if (isSorted) cssClass = 'cell-sorted';
+
+        let pointerHtml = '';
+        if (isI || isJ) {
+            pointerHtml = `
+                <div class="absolute -bottom-8 flex flex-col items-center w-full">
+                    <span class="text-xs font-bold ${isI ? 'text-yellow-600' : 'text-blue-600'}">↑</span>
+                    <span class="text-[10px] font-bold ${isI ? 'text-yellow-600' : 'text-blue-600'} -mt-1">${isI ? 'i' : 'j'}</span>
+                </div>
+            `;
+        }
+
+        const cellHtml = `
+            <div class="relative flex flex-col items-center">
+                <div class="text-[10px] text-slate-400 mb-1">A[${idx}]</div>
+                <div class="w-12 h-14 sm:w-14 sm:h-16 border-2 rounded-lg flex items-center justify-center text-lg font-bold array-cell ${cssClass}">
+                    ${val}
+                </div>
+                ${pointerHtml}
+            </div>
+        `;
+        arrayContainer.insertAdjacentHTML('beforeend', cellHtml);
+    });
+
+    // 4. 渲染 temp 辅助变量
+    if (step.temp !== null) {
+        tempContainer.innerHTML = step.temp;
+        tempContainer.className = "w-14 h-14 border-2 rounded-lg flex items-center justify-center text-xl font-bold bg-yellow-100 border-yellow-400 text-yellow-700 shadow-lg array-cell transform scale-110";
+    } else {
+        tempContainer.innerHTML = "空";
+        tempContainer.className = "w-14 h-14 border-2 border-dashed border-slate-400 rounded-lg flex items-center justify-center text-xl font-bold text-slate-400 bg-white shadow-inner array-cell";
+    }
+
+    updateControls();
+}
+
+/* =========================================================================
+ * 3. 播放与交互控制
+ * ========================================================================= */
+function updateControls() {
+    const total = steps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '0 / 0' : `${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停播放';
+        playBtn.className = 'px-6 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition shadow-sm w-32 flex justify-center';
+    } else {
+        playBtn.innerText = '▶ 自动播放';
+        playBtn.className = 'px-6 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition shadow-sm w-32 flex justify-center';
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < steps.length) {
+        currentStepIdx = idx;
+        renderStep(currentStepIdx);
+    }
+}
+
+function nextStep() {
+    if (currentStepIdx < steps.length - 1) showStep(currentStepIdx + 1);
+    else stopPlay();
+}
+
+function prevStep() {
+    if (currentStepIdx > 0) showStep(currentStepIdx - 1);
+}
+
+function togglePlay() {
+    if(steps.length === 0) return;
+    if (playInterval) {
+        stopPlay();
+    } else {
+        if (currentStepIdx >= steps.length - 1) currentStepIdx = 0; // 播完重播
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value); // 计算延迟
+        playInterval = setInterval(nextStep, speed);
+        updateControls();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        updateControls();
+    }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } 
+});
+
+function initSort() {
+    stopPlay();
+    const inputStr = document.getElementById('array-input').value;
+    // 解析并过滤无效输入
+    const initialArr = inputStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    
+    if (initialArr.length < 2) {
+        alert("请输入至少包含两个数字的数组（以逗号分隔）。");
+        return;
+    }
+    if (initialArr.length > 15) {
+        alert("为了演示效果，建议数组长度不超过 15 个元素。");
+        return;
+    }
+
+    // 格式化输入框
+    document.getElementById('array-input').value = initialArr.join(', ');
+    
+    // 生成步骤并渲染第一帧
+    steps = generateSteps(initialArr);
+    currentStepIdx = 0;
+    renderStep(0);
+}
+
+function generateRandom() {
+    const len = Math.floor(Math.random() * 5) + 6; // 随机 6 ~ 10 个元素
+    const arr = [];
+    for(let i=0; i<len; i++) {
+        arr.push(Math.floor(Math.random() * 90) + 10); // 10 ~ 99 两位数
+    }
+    document.getElementById('array-input').value = arr.join(', ');
+    initSort();
+}
+
+// 绑定回车键
+document.getElementById('array-input').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') initSort();
+});
+
+// 页面加载完毕初始化
+window.onload = () => {
+    initSort();
+};
+</script>
+</body>
+</html>
