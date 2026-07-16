@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>堆排序 (Heap Sort) - 408 图解版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        
+        /* 数组单元格样式 */
+        .cell-default { background-color: #ffffff; border-color: #cbd5e1; color: #334155; }
+        .cell-active { background-color: #fef08a; border-color: #eab308; color: #854d0e; transform: scale(1.05); z-index: 10; font-weight: bold;}
+        .cell-compare { background-color: #bfdbfe; border-color: #3b82f6; color: #1e3a8a; }
+        .cell-final { background-color: #dcfce7; border-color: #22c55e; color: #166534; }
+        .cell-hole { background-color: #f1f5f9; border-color: #94a3b8; border-style: dashed; color: transparent; }
+        
+        /* 树节点样式 (SVG) */
+        .node-circle { transition: all 0.3s ease; stroke-width: 2px; }
+        .node-text { font-size: 14px; font-weight: bold; text-anchor: middle; dominant-baseline: central; transition: all 0.3s ease; }
+        .edge-line { stroke: #cbd5e1; stroke-width: 2px; transition: all 0.3s ease; }
+        
+        /* 状态映射 */
+        .state-default circle { fill: #ffffff; stroke: #cbd5e1; }
+        .state-default text { fill: #334155; }
+        .state-active circle { fill: #fef08a; stroke: #eab308; stroke-width: 3px; }
+        .state-active text { fill: #854d0e; }
+        .state-compare circle { fill: #bfdbfe; stroke: #3b82f6; }
+        .state-compare text { fill: #1e3a8a; }
+        .state-final circle { fill: #dcfce7; stroke: #22c55e; }
+        .state-final text { fill: #166534; }
+        .state-hole circle { fill: #f1f5f9; stroke: #94a3b8; stroke-dasharray: 4; }
+        .state-hole text { fill: transparent; }
+
+        /* 代码高亮 */
+        .code-line { display: block; padding: 0px 6px; border-radius: 4px; transition: background-color 0.2s; line-height: 1.4; }
+        .code-line.active { background-color: rgba(234, 179, 8, 0.4); border-left: 4px solid #eab308; }
+        
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- 顶部标题与 408 考点 -->
+    <header class="bg-white border-b border-slate-200 py-3 px-6 shadow-sm z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                🌲 堆排序 (大根堆) <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-normal">408 核心算法</span>
+            </h1>
+            <p class="text-slate-500 text-xs mt-1">完全二叉树的数组实现。升序排序需建大根堆。</p>
+        </div>
+        
+        <!-- 408 核心考点 -->
+        <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs text-slate-700 shadow-inner max-w-2xl">
+            <h3 class="font-bold text-red-600 mb-1">🔥 408 考点速记：</h3>
+            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                <li><span class="font-bold">时间复杂度：</span>建堆 <strong class="text-blue-600">O(n)</strong>，排序 <strong class="text-blue-600">O(n log n)</strong>。整体 <strong>O(n log n)</strong>。</li>
+                <li><span class="font-bold">空间复杂度：</span><strong class="text-blue-600">O(1)</strong> (仅需常数辅助变量)。</li>
+                <li><span class="font-bold">稳定性：</span><strong class="text-red-600">不稳定 (Unstable)</strong>。</li>
+                <li><span class="font-bold">索引关系：</span>(若从0开始) 节点 <code>i</code> 的左孩子 <code>2i+1</code>，右孩子 <code>2i+2</code>，父节点 <code>(i-1)/2</code>。</li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 flex flex-col gap-3 h-[calc(100vh-100px)]">
+        
+        <!-- 控制台 -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-wrap items-center gap-3">
+            <div class="flex-1 min-w-[200px]">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-slate-600 whitespace-nowrap">输入数组:</label>
+                    <input type="text" id="array-input" value="53, 17, 78, 9, 45, 65, 87, 32" 
+                           class="w-full px-2 py-1 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="generateRandom()" class="px-3 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition font-medium text-sm">🎲 随机</button>
+                <button onclick="initSort()" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-medium text-sm shadow-sm">载入执行</button>
+            </div>
+            <div class="h-6 border-l border-slate-300 mx-1 hidden lg:block"></div>
+            <div class="flex items-center gap-2">
+                <button onclick="prevStep()" id="btn-prev" class="px-3 py-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 disabled:opacity-50 transition text-sm">上一步</button>
+                <button onclick="togglePlay()" id="btn-play" class="px-5 py-1 bg-green-500 text-white rounded font-bold hover:bg-green-600 transition shadow-sm w-24 text-sm">▶ 播放</button>
+                <button onclick="nextStep()" id="btn-next" class="px-3 py-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 disabled:opacity-50 transition text-sm">下一步</button>
+            </div>
+            <div class="flex items-center gap-2 ml-auto">
+                <span class="text-xs text-slate-500">速度:</span>
+                <input type="range" id="speed-slider" min="300" max="2500" value="1200" class="w-16" style="direction: rtl;">
+                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-full" id="step-counter">0 / 0</span>
+            </div>
+        </div>
+
+        <!-- 核心视图区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 overflow-hidden">
+            
+            <!-- 左侧：可视化视图 (占比 3/5) -->
+            <div class="lg:col-span-3 flex flex-col gap-3">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col items-center flex-1 relative overflow-hidden">
+                    
+                    <!-- 顶部：临时变量区和图例 -->
+                    <div class="flex justify-between w-full mb-2">
+                        <div class="flex items-center gap-2 bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-lg shadow-sm">
+                            <span class="text-xs font-bold text-yellow-700">临时变量 (temp):</span>
+                            <div id="temp-box" class="w-8 h-8 flex items-center justify-center bg-white border-2 border-yellow-400 rounded text-yellow-700 font-bold text-sm">空</div>
+                        </div>
+                        <div class="flex flex-col gap-1 text-[10px] text-slate-500 font-medium">
+                            <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-[#fef08a] border border-[#eab308]"></span> 当前目标/考察节点</div>
+                            <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-[#bfdbfe] border border-[#3b82f6]"></span> 比较中的子节点</div>
+                            <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-[#dcfce7] border border-[#22c55e]"></span> 最终排序就位</div>
+                        </div>
+                    </div>
+
+                    <!-- 一维数组视图 -->
+                    <div class="w-full mt-2 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                        <div class="text-[11px] font-bold text-slate-500 mb-1">底层存储 (一维数组)</div>
+                        <div id="arr-container" class="flex overflow-x-auto no-scrollbar gap-1 sm:gap-2 px-1 pb-1"></div>
+                    </div>
+
+                    <!-- 逻辑结构：完全二叉树视图 (SVG) -->
+                    <div class="w-full flex-1 relative flex flex-col items-center justify-start min-h-[250px]">
+                        <div class="text-[11px] font-bold text-slate-500 absolute top-0 left-0">逻辑结构 (完全二叉树)</div>
+                        <svg id="tree-svg" class="w-full h-full mt-4" viewBox="0 0 800 300" preserveAspectRatio="xMidYMin meet">
+                            <g id="edges-layer"></g>
+                            <g id="nodes-layer"></g>
+                        </svg>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 右侧：解说、伪代码、实现代码 (占比 2/5) -->
+            <div class="lg:col-span-2 flex flex-col gap-3 h-full">
+                
+                <!-- 算法解说面板 -->
+                <div class="bg-slate-800 rounded-xl shadow-md border border-slate-700 p-4 flex flex-col min-h-[160px] shrink-0">
+                    <h2 class="font-bold text-slate-200 mb-2 border-b border-slate-600 pb-1 text-sm flex items-center gap-2">
+                        💡 算法过程解析
+                    </h2>
+                    <div id="explanation-box" class="text-[13px] leading-relaxed overflow-y-auto no-scrollbar flex-1 text-slate-300">
+                        等待初始化...
+                    </div>
+                </div>
+
+                <!-- 伪代码与 C 代码面板 -->
+                <div class="bg-[#1e1e1e] rounded-xl shadow-md border border-slate-700 overflow-hidden flex flex-col flex-1">
+                    
+                    <div class="bg-[#2d2d2d] px-3 py-1 text-[11px] text-gray-400 font-mono flex items-center justify-between border-b border-[#3d3d3d]">
+                        <span>💻 堆排序 C语言实现 (0-based索引版)</span>
+                    </div>
+                    <div class="p-2 overflow-x-auto text-[12px] font-mono text-gray-300 bg-[#1e1e1e] flex-1">
+<pre><code id="code-container">
+<span id="line-1" class="code-line"><span class="text-gray-500">// 向下调整函数：以 i 为根，在长度为 len 的堆中进行向下调整</span></span>
+<span id="line-2" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">AdjustDown</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> i, <span class="text-pink-400">int</span> len) {</span>
+<span id="line-3" class="code-line">    <span class="text-pink-400">int</span> temp = A[i]; <span class="text-gray-500">// 暂存当前子树的根节点</span></span>
+<span id="line-4" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> k = <span class="text-orange-400">2</span>*i + <span class="text-orange-400">1</span>; k < len; k = <span class="text-orange-400">2</span>*k + <span class="text-orange-400">1</span>) { <span class="text-gray-500">// 沿值较大的子节点向下筛选</span></span>
+<span id="line-5" class="code-line">        <span class="text-pink-400">if</span> (k + <span class="text-orange-400">1</span> < len && A[k] < A[k + <span class="text-orange-400">1</span>]) </span>
+<span id="line-6" class="code-line">            k++; <span class="text-gray-500">// k 记录值较大的那个子节点的下标</span></span>
+<span id="line-7" class="code-line">        <span class="text-pink-400">if</span> (temp >= A[k]) </span>
+<span id="line-8" class="code-line">            <span class="text-pink-400">break</span>; <span class="text-gray-500">// 若父节点已经大于等于最大子节点，筛选结束</span></span>
+<span id="line-9" class="code-line">        <span class="text-pink-400">else</span> {</span>
+<span id="line-10" class="code-line">            A[i] = A[k]; <span class="text-gray-500">// 将较大的子节点上提填补空位</span></span>
+<span id="line-11" class="code-line">            i = k;       <span class="text-gray-500">// 空位下移到子节点位置，继续向下比较</span></span>
+<span id="line-12" class="code-line">        }</span>
+<span id="line-13" class="code-line">    }</span>
+<span id="line-14" class="code-line">    A[i] = temp; <span class="text-gray-500">// 将当初暂存的根节点放入最终找到的空位</span></span>
+<span id="line-15" class="code-line">}</span>
+<span id="line-16" class="code-line"></span>
+<span id="line-17" class="code-line"><span class="text-pink-400">void</span> <span class="text-blue-400">HeapSort</span>(<span class="text-pink-400">int</span> A[], <span class="text-pink-400">int</span> n) {</span>
+<span id="line-18" class="code-line">    <span class="text-gray-500">// 1. 建初堆：从最后一个非叶子节点开始，逆序向上调整</span></span>
+<span id="line-19" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = n / <span class="text-orange-400">2</span> - <span class="text-orange-400">1</span>; i >= <span class="text-orange-400">0</span>; i--) </span>
+<span id="line-20" class="code-line">        AdjustDown(A, i, n);</span>
+<span id="line-21" class="code-line">    </span>
+<span id="line-22" class="code-line">    <span class="text-gray-500">// 2. 排序：根节点与堆尾交换，然后堆大小减1并重新调整根节点</span></span>
+<span id="line-23" class="code-line">    <span class="text-pink-400">for</span> (<span class="text-pink-400">int</span> i = n - <span class="text-orange-400">1</span>; i > <span class="text-orange-400">0</span>; i--) {</span>
+<span id="line-24" class="code-line">        <span class="text-pink-400">int</span> temp = A[<span class="text-orange-400">0</span>]; A[<span class="text-orange-400">0</span>] = A[i]; A[i] = temp; <span class="text-gray-500">// 交换栈顶和堆尾</span></span>
+<span id="line-25" class="code-line">        AdjustDown(A, <span class="text-orange-400">0</span>, i); <span class="text-gray-500">// 将剩余的 i 个元素重新调整为大根堆</span></span>
+<span id="line-26" class="code-line">    }</span>
+<span id="line-27" class="code-line">}</span>
+</code></pre>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+<script>
+/* =========================================================================
+ * 1. 核心算法：生成步骤快照
+ * ========================================================================= */
+let steps = [];
+let currentStepIdx = 0;
+let playInterval = null;
+
+function generateSteps(initialA) {
+    let stepsOut = [];
+    let A = [...initialA];
+    let n = A.length;
+    let sortedSet = new Set();
+    
+    // 工具：记录快照
+    const pushStep = (line, msg, heapSize, holeIdx, tempVal, activeIdx, compareIdx1, compareIdx2) => {
+        stepsOut.push({
+            A: [...A],
+            sorted: new Set(sortedSet),
+            heapSize: heapSize,
+            hole: holeIdx ?? -1,
+            temp: tempVal !== undefined ? tempVal : null,
+            active: activeIdx ?? -1,
+            cmp1: compareIdx1 ?? -1,
+            cmp2: compareIdx2 ?? -1,
+            line: line,
+            msg: msg
+        });
+    };
+
+    // 内部函数：向下调整
+    function adjustDown(i, len, isBuilding) {
+        let temp = A[i];
+        let hole = i;
+        let phaseDesc = isBuilding ? "【建初堆】" : "【排序重调】";
+
+        pushStep(3, `${phaseDesc} <strong>向下调整 AdjustDown(i=${i}, len=${len})</strong><br>暂存当前子树的根节点 <code>temp = A[${i}] = ${temp}</code>。此时节点 ${i} 视为空位(坑)。`, len, hole, temp, hole);
+
+        for (let k = 2 * i + 1; k < len; k = 2 * k + 1) {
+            pushStep(4, `${phaseDesc} 考察节点 ${hole} 的子节点。首先假定左孩子 <code>k = ${k}</code> (值为 ${A[k]}) 较大。`, len, hole, temp, hole, k);
+
+            if (k + 1 < len) {
+                pushStep(5, `${phaseDesc} 发现存在右孩子 <code>k+1 = ${k+1}</code> (值为 ${A[k+1]})。<br>比较左右孩子大小：<code>A[${k}]</code> 和 <code>A[${k+1}]</code>。`, len, hole, temp, hole, k, k+1);
+                if (A[k] < A[k + 1]) {
+                    k++;
+                    pushStep(6, `${phaseDesc} 右孩子更大 (<code>${A[k-1]} < ${A[k]}</code>)，更新 <code>k = ${k}</code>，指向右孩子。`, len, hole, temp, hole, k);
+                } else {
+                    pushStep(6, `${phaseDesc} 左孩子更大或相等 (<code>${A[k]} &ge; ${A[k+1]}</code>)，<code>k</code> 保持指向左孩子 ${k}。`, len, hole, temp, hole, k);
+                }
+            }
+
+            pushStep(7, `${phaseDesc} 比较暂存值 <code>temp = ${temp}</code> 与最大的子节点 <code>A[${k}] = ${A[k]}</code>。`, len, hole, temp, hole, k);
+
+            if (temp >= A[k]) {
+                pushStep(8, `${phaseDesc} <code>temp (${temp}) &ge; A[k] (${A[k]})</code>。<br>根节点已经比子节点大，满足大根堆性质，终止本轮向下筛选。`, len, hole, temp, hole);
+                break;
+            } else {
+                A[hole] = A[k];
+                A[k] = ''; // 视觉上的空洞转移
+                pushStep(10, `${phaseDesc} <code>temp (${temp}) < A[k] (${A[hole]})</code>。<br>将较大的子节点 ${A[hole]} 上提填补到空位 <code>A[${hole}]</code> 中。`, len, hole, temp, hole);
+                
+                hole = k;
+                i = k;
+                pushStep(11, `${phaseDesc} 空位下移到了 <code>i = ${hole}</code>，将继续以该节点为基础向下考察。`, len, hole, temp, hole);
+            }
+        }
+        
+        A[hole] = temp;
+        pushStep(14, `${phaseDesc} 筛选结束。将当初暂存的 <code>temp = ${temp}</code> 放入最终确定的空位 <code>A[${hole}]</code> 中。调整完成！`, len, -1, null, hole);
+    }
+
+    pushStep(17, `<strong>初始状态：</strong>输入数组被看作一棵<strong class="text-blue-500">完全二叉树</strong>。<br>为了将其升序排序，我们需要先将其改造为一个<strong class="text-red-500">大根堆</strong>。`);
+
+    // 1. 建初堆
+    pushStep(18, `<strong>1. 建初堆：</strong><br>根据完全二叉树性质，从最后一个非叶子节点 <code>i = n/2 - 1 = ${Math.floor(n/2)-1}</code> 开始，逆序依次向上进行 <strong>向下调整(AdjustDown)</strong> 操作。`, n);
+    for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+        pushStep(19, `当前定位到非叶子节点 <code>i = ${i}</code>，准备对其所在的子树进行向下调整。`, n, -1, null, i);
+        adjustDown(i, n, true);
+    }
+    pushStep(21, `🎉 <strong>建初堆完成！</strong><br>此时整棵树已经满足大根堆性质：任何一个父节点的值都大于等于其左右孩子。根节点 <code>A[0] = ${A[0]}</code> 是全局最大值。`, n);
+
+    // 2. 排序
+    for (let i = n - 1; i > 0; i--) {
+        pushStep(23, `<strong>2. 排序交换：</strong><br>准备将堆顶最大值 <code>A[0] = ${A[0]}</code> 与当前堆底元素 <code>A[${i}] = ${A[i]}</code> 交换。`, i+1, -1, null, 0, i);
+        
+        // 交换
+        let temp = A[0];
+        A[0] = A[i];
+        A[i] = temp;
+        sortedSet.add(i);
+        
+        pushStep(24, `<strong>交换完成，最大值归位：</strong><br><code>${temp}</code> 已经被放置到数组末尾 <code>A[${i}]</code>，彻底排序就位(标绿)。<br>堆的有效长度缩小为 <code>${i}</code>。此时新的根节点 <code>A[0]=${A[0]}</code> 可能破坏了堆性质，需要调整。`, i, -1, null, 0);
+
+        // 向下调整恢复堆
+        adjustDown(0, i, false);
+    }
+    
+    sortedSet.add(0);
+    pushStep(27, `🎉 <strong>堆排序全部完成！</strong><br>整个一维数组已经完全升序排列。<br>时间复杂度 O(n log n)，空间复杂度 O(1)。`, 0);
+
+    return stepsOut;
+}
+
+/* =========================================================================
+ * 2. 界面渲染控制 (SVG 二叉树 + 一维数组)
+ * ========================================================================= */
+const arrContainer = document.getElementById('arr-container');
+const expBox = document.getElementById('explanation-box');
+const tempBox = document.getElementById('temp-box');
+const treeNodesLayer = document.getElementById('nodes-layer');
+const treeEdgesLayer = document.getElementById('edges-layer');
+
+// 计算完全二叉树的 SVG 坐标
+function getTreeLayout(n) {
+    const layout = [];
+    const svgWidth = 800;
+    const levelHeight = 60;
+    const startY = 30;
+
+    // 按层次遍历计算坐标
+    // 根节点在中间
+    layout[0] = { x: svgWidth / 2, y: startY };
+    
+    // 简单的水平偏移量公式，保证子树不交叉
+    for (let i = 1; i < n; i++) {
+        let parent = Math.floor((i - 1) / 2);
+        let level = Math.floor(Math.log2(i + 1)); // 0, 1, 2...
+        // 随着层数增加，水平偏移量减半
+        let hOffset = (svgWidth / 2) / Math.pow(2, level);
+        
+        if (i % 2 === 1) { // 左孩子
+            layout[i] = { x: layout[parent].x - hOffset, y: layout[parent].y + levelHeight };
+        } else { // 右孩子
+            layout[i] = { x: layout[parent].x + hOffset, y: layout[parent].y + levelHeight };
+        }
+    }
+    return layout;
+}
+
+// 初始化渲染 SVG 骨架 (节点和边在步骤切换时不用重绘 DOM，只变动属性)
+let treeCoords = [];
+function initSVG(n) {
+    treeCoords = getTreeLayout(n);
+    treeNodesLayer.innerHTML = '';
+    treeEdgesLayer.innerHTML = '';
+
+    for(let i=0; i<n; i++) {
+        // 画边
+        let left = 2*i + 1;
+        let right = 2*i + 2;
+        if(left < n) {
+            treeEdgesLayer.insertAdjacentHTML('beforeend', `<line id="edge-${i}-${left}" class="edge-line" x1="${treeCoords[i].x}" y1="${treeCoords[i].y}" x2="${treeCoords[left].x}" y2="${treeCoords[left].y}" />`);
+        }
+        if(right < n) {
+            treeEdgesLayer.insertAdjacentHTML('beforeend', `<line id="edge-${i}-${right}" class="edge-line" x1="${treeCoords[i].x}" y1="${treeCoords[i].y}" x2="${treeCoords[right].x}" y2="${treeCoords[right].y}" />`);
+        }
+
+        // 画节点
+        treeNodesLayer.insertAdjacentHTML('beforeend', `
+            <g id="node-g-${i}" transform="translate(${treeCoords[i].x}, ${treeCoords[i].y})" class="state-default">
+                <circle cx="0" cy="0" r="16" class="node-circle" />
+                <text x="0" y="1" class="node-text"></text>
+                <text x="-20" y="-15" font-size="10" fill="#94a3b8">A[${i}]</text>
+            </g>
+        `);
+    }
+}
+
+function renderStep(idx) {
+    if (idx < 0 || idx >= steps.length) return;
+    const step = steps[idx];
+    const n = step.A.length;
+
+    // 1. 代码高亮
+    document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+    if (step.line !== -1) {
+        const lineEl = document.getElementById(`line-${step.line}`);
+        if (lineEl) lineEl.classList.add('active');
+    }
+
+    // 2. 解说面板
+    expBox.innerHTML = step.msg;
+
+    // 3. Temp 变量
+    if (step.temp !== null) {
+        tempBox.innerHTML = step.temp;
+        tempBox.classList.remove('text-slate-300', 'border-dashed');
+        tempBox.classList.add('text-yellow-700', 'bg-yellow-100', 'border-solid');
+    } else {
+        tempBox.innerHTML = "空";
+        tempBox.classList.add('text-slate-300', 'border-dashed');
+        tempBox.classList.remove('text-yellow-700', 'bg-yellow-100', 'border-solid');
+    }
+
+    // 4. 渲染一维数组 和 5. 渲染 SVG 二叉树
+    arrContainer.innerHTML = '';
+    
+    for(let i=0; i<n; i++) {
+        let val = step.A[i];
+        let isFinal = step.sorted.has(i);
+        let inHeap = i < step.heapSize;
+        let isHole = i === step.hole;
+        let isActive = i === step.active;
+        let isCmp = i === step.cmp1 || i === step.cmp2;
+
+        let clsArray = 'cell-default';
+        let clsSvg = 'state-default';
+        
+        if (!inHeap && !isFinal) {
+            // 理论上不会出现，非堆即排序好
+        }
+        
+        if (isFinal) { clsArray = 'cell-final'; clsSvg = 'state-final'; }
+        else if (isHole) { clsArray = 'cell-hole'; clsSvg = 'state-hole'; val = '';}
+        else if (isActive) { clsArray = 'cell-active'; clsSvg = 'state-active'; }
+        else if (isCmp) { clsArray = 'cell-compare'; clsSvg = 'state-compare'; }
+
+        // 一维数组 DOM
+        arrContainer.insertAdjacentHTML('beforeend', `
+            <div class="flex flex-col items-center">
+                <div class="text-[10px] text-slate-500 mb-0.5">A[${i}]</div>
+                <div class="w-9 h-10 sm:w-10 sm:h-11 border-2 rounded flex items-center justify-center font-bold text-sm sm:text-base transition-all ${clsArray}">${val}</div>
+            </div>
+        `);
+
+        // SVG 树节点更新
+        let gNode = document.getElementById(`node-g-${i}`);
+        if(gNode) {
+            gNode.setAttribute('class', clsSvg);
+            // 对于非堆元素(已被排序到末尾)，在树中可以降低透明度以示区分
+            if(isFinal) {
+                gNode.style.opacity = '0.4';
+            } else {
+                gNode.style.opacity = '1';
+            }
+            gNode.querySelector('.node-text').textContent = val;
+        }
+    }
+
+    // 6. SVG 连线状态更新
+    for(let i=0; i<n; i++) {
+        let left = 2*i + 1;
+        let right = 2*i + 2;
+        [left, right].forEach(child => {
+            if(child < n) {
+                let edge = document.getElementById(`edge-${i}-${child}`);
+                if(edge) {
+                    // 如果父子都还在堆里，实线，否则如果是比较状态就高亮
+                    if (child >= step.heapSize) {
+                        edge.style.stroke = '#f1f5f9'; // 隐藏断开的堆连线
+                    } else if ((i === step.active && (child === step.cmp1 || child === step.cmp2)) || 
+                               (i === step.hole && (child === step.cmp1 || child === step.cmp2))) {
+                        edge.style.stroke = '#3b82f6'; // 比较连线高亮
+                        edge.style.strokeWidth = '3px';
+                    } else {
+                        edge.style.stroke = '#cbd5e1';
+                        edge.style.strokeWidth = '2px';
+                    }
+                }
+            }
+        });
+    }
+
+    updateControls();
+}
+
+/* =========================================================================
+ * 3. 播放控制
+ * ========================================================================= */
+function updateControls() {
+    const total = steps.length;
+    document.getElementById('step-counter').innerText = total === 0 ? '0 / 0' : `${currentStepIdx + 1} / ${total}`;
+    document.getElementById('btn-prev').disabled = currentStepIdx <= 0 || total === 0;
+    document.getElementById('btn-next').disabled = currentStepIdx >= total - 1 || total === 0;
+    
+    const playBtn = document.getElementById('btn-play');
+    if(playInterval) {
+        playBtn.innerText = '⏸ 暂停';
+        playBtn.className = 'px-5 py-1 bg-yellow-500 text-white rounded font-bold hover:bg-yellow-600 transition shadow-sm w-24 text-sm';
+    } else {
+        playBtn.innerText = '▶ 播放';
+        playBtn.className = 'px-5 py-1 bg-green-500 text-white rounded font-bold hover:bg-green-600 transition shadow-sm w-24 text-sm';
+    }
+}
+
+function showStep(idx) {
+    if (idx >= 0 && idx < steps.length) {
+        currentStepIdx = idx;
+        renderStep(currentStepIdx);
+    }
+}
+
+function nextStep() { if (currentStepIdx < steps.length - 1) showStep(currentStepIdx + 1); else stopPlay(); }
+function prevStep() { if (currentStepIdx > 0) showStep(currentStepIdx - 1); }
+
+function togglePlay() {
+    if(steps.length === 0) return;
+    if (playInterval) stopPlay();
+    else {
+        if (currentStepIdx >= steps.length - 1) currentStepIdx = 0; 
+        const speed = 2800 - parseInt(document.getElementById('speed-slider').value); 
+        playInterval = setInterval(nextStep, speed);
+        updateControls();
+        nextStep(); 
+    }
+}
+
+function stopPlay() {
+    if (playInterval) { clearInterval(playInterval); playInterval = null; updateControls(); }
+}
+
+document.getElementById('speed-slider').addEventListener('change', () => {
+    if(playInterval) { stopPlay(); togglePlay(); } 
+});
+
+function initSort() {
+    stopPlay();
+    const inputStr = document.getElementById('array-input').value;
+    const initialArr = inputStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    
+    if (initialArr.length < 3) {
+        alert("请输入至少包含3个数字的数组（以逗号分隔）。"); return;
+    }
+    if (initialArr.length > 15) {
+        alert("为了保证完全二叉树的 SVG 渲染排版美观，数组长度请勿超过 15 个元素。"); return;
+    }
+    
+    document.getElementById('array-input').value = initialArr.join(', ');
+    
+    // 初始化树骨架
+    initSVG(initialArr.length);
+    
+    // 生成步骤并渲染第一帧
+    steps = generateSteps(initialArr);
+    currentStepIdx = 0;
+    renderStep(0);
+}
+
+function generateRandom() {
+    const len = Math.floor(Math.random() * 6) + 8; // 8 ~ 13 个元素
+    const arr = [];
+    for(let i=0; i<len; i++) {
+        arr.push(Math.floor(Math.random() * 90) + 10); 
+    }
+    document.getElementById('array-input').value = arr.join(', ');
+    initSort();
+}
+
+document.getElementById('array-input').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') initSort();
+});
+
+window.onload = initSort;
+</script>
+</body>
+</html>
